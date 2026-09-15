@@ -4273,6 +4273,17 @@ react-arborist@3.4.3:
     redux "^5.0.0"
     use-sync-external-store "^1.2.0"
 
+react-arborist@^3.16.0:
+  version "3.16.0"
+  resolved "https://registry.yarnpkg.com/react-arborist/-/react-arborist-3.16.0.tgz#03f2b89f7a49b220172ebb70ecfc83871ece9529"
+  integrity sha512-Pp1TQXETKMeg/0yAMGBFIwze7IfZaghDScX4vekJ4Ge8/t7uYifbDBhEGUSOYaDuahE1f8fyBIrlN2pLD4ysTA==
+  dependencies:
+    react-dnd "^14.0.3"
+    react-dnd-html5-backend "^14.0.3"
+    react-window "^1.8.11"
+    redux "^5.0.0"
+    use-sync-external-store "^1.2.0"
+
 react-aria-components@1.16.0:
   version "1.16.0"
   resolved "https://registry.yarnpkg.com/react-aria-components/-/react-aria-components-1.16.0.tgz#6a5d4c75d5e9bf2c83ef8837ac19fb0a50abb698"
