@@ -311,7 +311,7 @@ export default function Home() {
               variant="primary"
               onClick={handleTransferAll}
             >
-              Transfert All
+              Batch Apply
             </Button>
           </div>
 
