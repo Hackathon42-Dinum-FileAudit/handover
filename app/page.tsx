@@ -1,5 +1,5 @@
 "use client";
-import { useState, createContext, useContext } from "react";
+import { useState, createContext, useContext, useRef, useEffect } from "react";
 import { Tree } from "react-arborist";
 
 // UI-kit Components
@@ -84,7 +84,8 @@ function Node({ node, style, dragHandle }: any) {
     rowTargets,
     updateRowTarget,
     trashedStates,
-    toggleTrash
+    toggleTrash,
+    recalculateHeight // Ajout de la fonction de calcul de hauteur
   } = useContext(TreeContext);
 
   // États de la ligne
@@ -102,8 +103,6 @@ function Node({ node, style, dragHandle }: any) {
   return (
     <div
       style={style}
-      // La div parente n'a plus pointer-events-none globalement pour laisser le bouton Undo cliquable,
-      // on le gère sur les éléments internes
       className={`flex items-center gap-4 w-full pr-4 group min-w-0 border-b box-border transition-all duration-200 ${rowClasses}`}
     >
       <div
@@ -113,9 +112,10 @@ function Node({ node, style, dragHandle }: any) {
         {node.isInternal ? (
           <button
             onClick={(e) => {
-              // Permet d'ouvrir/fermer même si c'est grisé
               e.stopPropagation();
               node.toggle();
+              // On demande de recalculer la hauteur du parent juste après le toggle !
+              recalculateHeight();
             }}
             className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-black cursor-pointer rounded transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-700"
           >
@@ -131,7 +131,7 @@ function Node({ node, style, dragHandle }: any) {
           checked={isChecked}
           indeterminate={isIndeterminate}
           onChange={() => toggleNode(node)}
-          disabled={isTrashed} // Ajout de la prop disabled
+          disabled={isTrashed}
         />
       </div>
 
@@ -150,7 +150,7 @@ function Node({ node, style, dragHandle }: any) {
           searchable
           value={rowTargets[node.id] || undefined}
           onChange={(v: any) => updateRowTarget(node.id, extractValue(v))}
-          disabled={isTrashed} // Ajout de la prop disabled
+          disabled={isTrashed}
         />
       </div>
 
@@ -170,22 +170,39 @@ export default function Home() {
   const [rowTargets, setRowTargets] = useState<Record<string, string>>({});
   const [trashedStates, setTrashedStates] = useState<Record<string, boolean>>({});
 
-  // Logique métier : Suppression (Trash)
+  // NOUVEAU : Référence et état pour la hauteur de l'arbre
+  const treeRef = useRef<any>(null);
+  const [treeHeight, setTreeHeight] = useState(200);
+
+  // Fonction pour ajuster la hauteur de la boîte au pixel près
+  const recalculateHeight = () => {
+    // Un léger délai permet à react-arborist de finir d'ouvrir/fermer le dossier
+    setTimeout(() => {
+      if (treeRef.current) {
+        // Nombre de lignes visibles * 64px de hauteur de ligne
+        const newHeight = treeRef.current.visibleNodes.length * 64;
+        setTreeHeight(newHeight > 0 ? newHeight : 64);
+      }
+    }, 10);
+  };
+
+  // On calcule la hauteur une première fois au chargement de la page
+  useEffect(() => {
+    recalculateHeight();
+  }, []);
+
   const toggleTrash = (node: any) => {
-    const willBeTrashed = !trashedStates[node.id]; // Si c'était false, ça devient true (supprimé)
+    const willBeTrashed = !trashedStates[node.id];
 
     const nextTrashed = { ...trashedStates };
     const nextTargets = { ...rowTargets };
     const nextCheckboxes = { ...checkboxStates };
 
-    // Fonction récursive pour appliquer l'état à ce nœud et tous ses enfants
     const applyTrashToNodeAndChildren = (n: any) => {
       nextTrashed[n.id] = willBeTrashed;
 
       if (willBeTrashed) {
-        // "ça enlève le user sélectionné"
         delete nextTargets[n.id];
-        // On décoche également pour éviter les conflits
         nextCheckboxes[n.id] = 'unchecked';
       }
 
@@ -201,9 +218,7 @@ export default function Home() {
     setCheckboxStates(nextCheckboxes);
   };
 
-  // Logique métier : Checkboxes
   const toggleNode = (node: any) => {
-    // Si le nœud est supprimé, on ignore le clic
     if (trashedStates[node.id]) return;
 
     const currentState = checkboxStates[node.id] || 'unchecked';
@@ -227,7 +242,6 @@ export default function Home() {
     const setChildrenState = (n: any, stateToSet: string) => {
       if (n.children && n.children.length > 0) {
         n.children.forEach((child: any) => {
-          // On ne modifie l'état des enfants que s'ils ne sont pas supprimés
           if (!trashedStates[child.id]) {
             nextStates[child.id] = stateToSet;
             setChildrenState(child, stateToSet);
@@ -250,7 +264,6 @@ export default function Home() {
     const nextTargets = { ...rowTargets };
 
     Object.keys(checkboxStates).forEach(id => {
-      // On s'assure de ne pas affecter de target aux lignes supprimées
       if (!trashedStates[id] && (checkboxStates[id] === 'checked' || checkboxStates[id] === 'indeterminate')) {
         nextTargets[id] = globalTarget;
       }
@@ -263,8 +276,7 @@ export default function Home() {
   const handleReset = () => {
     setRowTargets({});
     setCheckboxStates({});
-    // Optionnel : tu pourrais dé-supprimer tout le monde avec le reset.
-    // setTrashedStates({});
+    setTrashedStates({});
   };
 
   return (
@@ -328,16 +340,18 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="w-full bg-white rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden">
+        <div className="w-full bg-white rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800">
           <TreeContext.Provider value={{
             checkboxStates, toggleNode,
             rowTargets, updateRowTarget,
-            trashedStates, toggleTrash
+            trashedStates, toggleTrash,
+            recalculateHeight // On passe la fonction au contexte
           }}>
             <Tree
+              ref={treeRef} // On lie la ref ici !
               initialData={data}
               width="100%"
-              height={600}
+              height={treeHeight} // Hauteur calculée dynamiquement en temps réel
               rowHeight={64}
               indent={24}
             >
