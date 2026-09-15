@@ -27,6 +27,27 @@ const data = [
     ],
   },
   { id: "2", label: "Dossier B" },
+  {
+    id: "3",
+    label: "Dossier C",
+    children: [
+      { id: "3-1", label: "Sous-dossier 1" },
+      { id: "3-2",
+        label: "Dossier C-1",
+        children: [
+          { id: "3-2-1", label: "Sous-dossier 1" },
+          { id: "3-2-2", label: "Sous-dossier 2" },
+        ],
+      },
+      { id: "3-3",
+        label: "Dossier C-2",
+        children: [
+          { id: "3-3-1", label: "Sous-dossier 1" },
+          { id: "3-3-2", label: "Sous-dossier 2" },
+        ],
+      }
+    ]
+  },
 ];
 
 const TreeContext = createContext<any>(null);
@@ -42,40 +63,60 @@ const extractValue = (v: any): string => {
   return "";
 };
 
-// Functions
-function DeleteButton() {
-  const [confirmed, setConfirmed] = useState(false);
+// Composant DeleteButton refactorisé pour utiliser les props
+function DeleteButton({ isTrashed, onToggle }: { isTrashed: boolean, onToggle: () => void }) {
   return (
     <Button
-      aria-label={confirmed ? "Confirmed" : "Delete"}
-      icon={confirmed ? <Undo /> : <Trash />}
+      aria-label={isTrashed ? "Restore" : "Delete"}
+      icon={isTrashed ? <Undo /> : <Trash />}
       variant="primary"
-      color={confirmed ? "success" : "error"}
-      onClick={() => setConfirmed(!confirmed)}
+      color={isTrashed ? "success" : "error"}
+      onClick={onToggle}
     />
   );
 }
 
 // Composant Node
 function Node({ node, style, dragHandle }: any) {
-  const { checkboxStates, toggleNode, rowTargets, updateRowTarget } = useContext(TreeContext);
+  const {
+    checkboxStates,
+    toggleNode,
+    rowTargets,
+    updateRowTarget,
+    trashedStates,
+    toggleTrash
+  } = useContext(TreeContext);
 
+  // États de la ligne
+  const isTrashed = trashedStates[node.id] || false;
   const cbState = checkboxStates[node.id] || 'unchecked';
+
   const isChecked = cbState === 'checked' || cbState === 'indeterminate';
   const isIndeterminate = cbState === 'indeterminate';
+
+  // Classes conditionnelles pour griser la ligne si elle est désactivée
+  const rowClasses = isTrashed
+    ? "bg-zinc-100 opacity-50 grayscale dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 pointer-events-none"
+    : "border-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 dark:border-zinc-800";
 
   return (
     <div
       style={style}
-      className="flex items-center gap-4 w-full pr-4 group min-w-0 border-b border-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 dark:border-zinc-800 box-border"
+      // La div parente n'a plus pointer-events-none globalement pour laisser le bouton Undo cliquable,
+      // on le gère sur les éléments internes
+      className={`flex items-center gap-4 w-full pr-4 group min-w-0 border-b box-border transition-all duration-200 ${rowClasses}`}
     >
       <div
-        className="flex items-center h-full"
+        className={`flex items-center h-full ${isTrashed ? 'pointer-events-auto' : ''}`}
         style={{ paddingLeft: `${node.level * 24}px` }}
       >
         {node.isInternal ? (
           <button
-            onClick={() => node.toggle()}
+            onClick={(e) => {
+              // Permet d'ouvrir/fermer même si c'est grisé
+              e.stopPropagation();
+              node.toggle();
+            }}
             className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-black cursor-pointer rounded transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-700"
           >
             <span className="text-xs">{node.isOpen ? '▼' : '▶'}</span>
@@ -85,11 +126,12 @@ function Node({ node, style, dragHandle }: any) {
         )}
       </div>
 
-      <div className="flex-shrink-0 flex items-center">
+      <div className={`flex-shrink-0 flex items-center ${isTrashed ? 'pointer-events-none' : ''}`}>
         <Checkbox
           checked={isChecked}
           indeterminate={isIndeterminate}
           onChange={() => toggleNode(node)}
+          disabled={isTrashed} // Ajout de la prop disabled
         />
       </div>
 
@@ -97,7 +139,7 @@ function Node({ node, style, dragHandle }: any) {
         {node.data.label}
       </span>
 
-      <div className="w-48 sm:w-64 flex-shrink-0 flex items-center">
+      <div className={`w-48 sm:w-64 flex-shrink-0 flex items-center ${isTrashed ? 'pointer-events-none' : ''}`}>
         <Select
           label="Select target user"
           options={[
@@ -108,11 +150,15 @@ function Node({ node, style, dragHandle }: any) {
           searchable
           value={rowTargets[node.id] || undefined}
           onChange={(v: any) => updateRowTarget(node.id, extractValue(v))}
+          disabled={isTrashed} // Ajout de la prop disabled
         />
       </div>
 
-      <div className="flex-shrink-0 flex items-center">
-        <DeleteButton/>
+      <div className="flex-shrink-0 flex items-center pointer-events-auto">
+        <DeleteButton
+          isTrashed={isTrashed}
+          onToggle={() => toggleTrash(node)}
+        />
       </div>
     </div>
   );
@@ -122,8 +168,44 @@ export default function Home() {
   const [globalTarget, setGlobalTarget] = useState("");
   const [checkboxStates, setCheckboxStates] = useState<Record<string, string>>({});
   const [rowTargets, setRowTargets] = useState<Record<string, string>>({});
+  const [trashedStates, setTrashedStates] = useState<Record<string, boolean>>({});
 
+  // Logique métier : Suppression (Trash)
+  const toggleTrash = (node: any) => {
+    const willBeTrashed = !trashedStates[node.id]; // Si c'était false, ça devient true (supprimé)
+
+    const nextTrashed = { ...trashedStates };
+    const nextTargets = { ...rowTargets };
+    const nextCheckboxes = { ...checkboxStates };
+
+    // Fonction récursive pour appliquer l'état à ce nœud et tous ses enfants
+    const applyTrashToNodeAndChildren = (n: any) => {
+      nextTrashed[n.id] = willBeTrashed;
+
+      if (willBeTrashed) {
+        // "ça enlève le user sélectionné"
+        delete nextTargets[n.id];
+        // On décoche également pour éviter les conflits
+        nextCheckboxes[n.id] = 'unchecked';
+      }
+
+      if (n.children && n.children.length > 0) {
+        n.children.forEach((child: any) => applyTrashToNodeAndChildren(child));
+      }
+    };
+
+    applyTrashToNodeAndChildren(node);
+
+    setTrashedStates(nextTrashed);
+    setRowTargets(nextTargets);
+    setCheckboxStates(nextCheckboxes);
+  };
+
+  // Logique métier : Checkboxes
   const toggleNode = (node: any) => {
+    // Si le nœud est supprimé, on ignore le clic
+    if (trashedStates[node.id]) return;
+
     const currentState = checkboxStates[node.id] || 'unchecked';
     let newState = 'unchecked';
     let childState = 'unchecked';
@@ -145,8 +227,11 @@ export default function Home() {
     const setChildrenState = (n: any, stateToSet: string) => {
       if (n.children && n.children.length > 0) {
         n.children.forEach((child: any) => {
-          nextStates[child.id] = stateToSet;
-          setChildrenState(child, stateToSet);
+          // On ne modifie l'état des enfants que s'ils ne sont pas supprimés
+          if (!trashedStates[child.id]) {
+            nextStates[child.id] = stateToSet;
+            setChildrenState(child, stateToSet);
+          }
         });
       }
     };
@@ -165,7 +250,8 @@ export default function Home() {
     const nextTargets = { ...rowTargets };
 
     Object.keys(checkboxStates).forEach(id => {
-      if (checkboxStates[id] === 'checked' || checkboxStates[id] === 'indeterminate') {
+      // On s'assure de ne pas affecter de target aux lignes supprimées
+      if (!trashedStates[id] && (checkboxStates[id] === 'checked' || checkboxStates[id] === 'indeterminate')) {
         nextTargets[id] = globalTarget;
       }
     });
@@ -177,6 +263,8 @@ export default function Home() {
   const handleReset = () => {
     setRowTargets({});
     setCheckboxStates({});
+    // Optionnel : tu pourrais dé-supprimer tout le monde avec le reset.
+    // setTrashedStates({});
   };
 
   return (
@@ -189,10 +277,7 @@ export default function Home() {
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 sm:px-8 sm:py-16 flex flex-col gap-8">
 
-        {/* Changement de items-end à items-center ici */}
         <div className="flex flex-wrap justify-between items-center gap-6 bg-white p-5 rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800">
-
-          {/* GROUPE GAUCHE : Changement de items-end à items-center ici */}
           <div className="flex flex-wrap items-center gap-6">
             <div className="w-72">
               <Select
@@ -230,7 +315,6 @@ export default function Home() {
             </Button>
           </div>
 
-          {/* GROUPE DROITE : Changement de items-end à items-center ici */}
           <div className="flex flex-wrap items-center gap-4">
             <Button
               icon={<Retry />}
@@ -245,7 +329,11 @@ export default function Home() {
         </div>
 
         <div className="w-full bg-white rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden">
-          <TreeContext.Provider value={{ checkboxStates, toggleNode, rowTargets, updateRowTarget }}>
+          <TreeContext.Provider value={{
+            checkboxStates, toggleNode,
+            rowTargets, updateRowTarget,
+            trashedStates, toggleTrash
+          }}>
             <Tree
               initialData={data}
               width="100%"
