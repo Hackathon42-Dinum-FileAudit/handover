@@ -1,16 +1,28 @@
 "use client";
+import { useState } from "react";
+
+// UI-kit Components
 import { Footer } from "@gouvfr-lasuite/ui-components";
 import { Header } from "@gouvfr-lasuite/ui-components";
 import { Select } from "@gouvfr-lasuite/ui-components";
 import { Button } from "@gouvfr-lasuite/ui-components";
-import { ArrowLeftRight } from "@gouvfr-lasuite/ui-components/icons";
 import {
   TreeProvider,
   TreeView,
   TreeViewItem,
   TreeViewNodeTypeEnum,
 } from "@gouvfr-lasuite/ui-components";
+import { Checkbox } from "@gouvfr-lasuite/ui-components";
 
+// UI-kit Icons
+import { ArrowLeftRight } from "@gouvfr-lasuite/ui-components/icons";
+import { Trash } from "@gouvfr-lasuite/ui-components/icons";
+import { Undo } from "@gouvfr-lasuite/ui-components/icons";
+import { Retry } from "@gouvfr-lasuite/ui-components/icons";
+import { Send } from "@gouvfr-lasuite/ui-components/icons";
+
+
+// Data
 const data = [
   {
     id: "1",
@@ -25,11 +37,28 @@ const data = [
   { id: "2", nodeType: TreeViewNodeTypeEnum.NODE, label: "Dossier B" },
 ];
 
+// Functions
+function DeleteButton() {
+  const [confirmed, setConfirmed] = useState(false);
+
+  return (
+    <Button
+      aria-label={confirmed ? "Confirmed" : "Delete"}
+      icon={confirmed ? <Undo /> : <Trash />}
+      variant="primary"
+      color={confirmed ? "success" : "error"}
+      onClick={() => setConfirmed(!confirmed)}
+    />
+  );
+}
+
+
 function Node(props: any) {
   const { node, style, dragHandle } = props;
   return (
     <TreeViewItem {...props}>
       <div className="flex items-center justify-between w-full pr-2 group">
+        <Checkbox></Checkbox>
         <span>{node.data.value.label}</span>
         <Select
             label="Select target user"
@@ -49,15 +78,12 @@ function Node(props: any) {
             ]}
             searchable
           />
-          <Button
-            aria-label="Button with only an icon"
-            icon={<span className="material-icons">bolt</span>}
-            variant="primary"
-          />
+          <DeleteButton/>
       </div>
     </TreeViewItem>
   );
 }
+
 
 export default function Home() {
   return (
@@ -114,6 +140,20 @@ export default function Home() {
             variant="primary"
           >
             Transfert All
+          </Button>
+          <Button
+            icon={<Retry />}
+            variant="primary"
+            color="warning"
+          >
+            Reset
+          </Button>
+          <Button
+            icon={<Send />}
+            variant="primary"
+            color="success"
+          >
+            Send
           </Button>
           <div>
             <TreeProvider initialTreeData={data as any}>
