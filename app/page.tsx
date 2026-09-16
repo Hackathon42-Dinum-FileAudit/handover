@@ -23,19 +23,27 @@ const data = [
   {
     id: "1",
     label: "Dossier A",
+    type: "folder", // <-- Indication explicite
     children: [
       { id: "1-1", label: "report.pdf", mimetype: "application/pdf" },
       { id: "1-2", label: "budget.calc", mimetype: "application/vnd.oasis.opendocument.spreadsheet" },
     ],
   },
-  { id: "2", label: "Dossier B" },
+  {
+    id: "2",
+    label: "Dossier B",
+    type: "folder", // <-- Même sans enfants, c'est un dossier
+    children: [] // Bonne pratique pour Arborist
+  },
   {
     id: "3",
     label: "Dossier C",
+    type: "folder", // <-- Indication explicite
     children: [
       { id: "3-1", label: "presentation.pptx", mimetype: "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
       { id: "3-2",
         label: "Dossier C-1",
+        type: "folder",
         children: [
           { id: "3-2-1", label: "data.csv", mimetype: "text/csv" },
           { id: "3-2-2", label: "archive.zip", mimetype: "application/zip" },
@@ -43,6 +51,7 @@ const data = [
       },
       { id: "3-3",
         label: "Dossier C-2",
+        type: "folder",
         children: [
           { id: "3-3-1", label: "photo.jpg", mimetype: "image/jpeg" },
           { id: "3-3-2", label: "audio.mp3", mimetype: "audio/mpeg" },
