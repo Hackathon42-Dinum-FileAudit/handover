@@ -148,7 +148,16 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-zinc-50 font-sans dark:bg-black">
 
       <div className="relative w-full border-b border-zinc-200 dark:border-zinc-800">
-        <Header leftIcon={<span className="font-semibold text-lg">Offboarding</span>} isPanelOpen={false} onTogglePanel={() => {}} />
+        <Header
+          leftIcon={
+            <div className="flex items-center gap-3">
+              <img src="/logo-fichiers.svg" alt="Logo Passation" className="h-8 w-auto" />
+              <span className="font-semibold text-lg">Offboarding</span>
+            </div>
+          }
+          isPanelOpen={false}
+          onTogglePanel={() => {}}
+        />
         <Stepper currentStep={step} />
       </div>
 
