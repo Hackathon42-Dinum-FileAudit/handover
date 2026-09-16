@@ -7,7 +7,7 @@ export default function WelcomeStep({ onNext }: { onNext: () => void }) {
       <HomeGutter>
         <Hero
           banner="/banner.png"
-          logo={<img alt="Logo Fichiers" src="/logo-fichiers.svg" width={64} />}
+          logo={<img alt="Logo Fichiers" src="/logo-passation.svg" width={164} />}
           title="Outil d'Offboarding"
           subtitle="Bienvenue dans l'interface de gestion des départs de La Suite Numérique. Transférez facilement les droits et auditez les fichiers."
           mainButton={
