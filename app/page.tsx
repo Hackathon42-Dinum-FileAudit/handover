@@ -7,7 +7,8 @@ import { Footer } from "@gouvfr-lasuite/ui-components";
 import { Header } from "@gouvfr-lasuite/ui-components";
 import { Select } from "@gouvfr-lasuite/ui-components";
 import { Button } from "@gouvfr-lasuite/ui-components";
-import { Checkbox } from "@gouvfr-lasuite/ui-components";
+// Ajout de FileIcon dans les imports
+import { Checkbox, FileIcon } from "@gouvfr-lasuite/ui-components";
 
 // UI-kit Icons
 import { ArrowLeftRight } from "@gouvfr-lasuite/ui-components/icons";
@@ -17,13 +18,14 @@ import { Retry } from "@gouvfr-lasuite/ui-components/icons";
 import { Send } from "@gouvfr-lasuite/ui-components/icons";
 
 // Data
+// J'ai mis à jour les données avec de vrais fichiers et des mimetypes pour tester les icônes
 const data = [
   {
     id: "1",
     label: "Dossier A",
     children: [
-      { id: "1-1", label: "Sous-dossier 1" },
-      { id: "1-2", label: "Sous-dossier 2" },
+      { id: "1-1", label: "report.pdf", mimetype: "application/pdf" },
+      { id: "1-2", label: "budget.calc", mimetype: "application/vnd.oasis.opendocument.spreadsheet" },
     ],
   },
   { id: "2", label: "Dossier B" },
@@ -31,19 +33,19 @@ const data = [
     id: "3",
     label: "Dossier C",
     children: [
-      { id: "3-1", label: "Sous-dossier 1" },
+      { id: "3-1", label: "presentation.pptx", mimetype: "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
       { id: "3-2",
         label: "Dossier C-1",
         children: [
-          { id: "3-2-1", label: "Sous-dossier 1" },
-          { id: "3-2-2", label: "Sous-dossier 2" },
+          { id: "3-2-1", label: "data.csv", mimetype: "text/csv" },
+          { id: "3-2-2", label: "archive.zip", mimetype: "application/zip" },
         ],
       },
       { id: "3-3",
         label: "Dossier C-2",
         children: [
-          { id: "3-3-1", label: "Sous-dossier 1" },
-          { id: "3-3-2", label: "Sous-dossier 2" },
+          { id: "3-3-1", label: "photo.jpg", mimetype: "image/jpeg" },
+          { id: "3-3-2", label: "audio.mp3", mimetype: "audio/mpeg" },
         ],
       }
     ]
@@ -85,17 +87,15 @@ function Node({ node, style, dragHandle }: any) {
     updateRowTarget,
     trashedStates,
     toggleTrash,
-    recalculateHeight // Ajout de la fonction de calcul de hauteur
+    recalculateHeight
   } = useContext(TreeContext);
 
-  // États de la ligne
   const isTrashed = trashedStates[node.id] || false;
   const cbState = checkboxStates[node.id] || 'unchecked';
 
   const isChecked = cbState === 'checked' || cbState === 'indeterminate';
   const isIndeterminate = cbState === 'indeterminate';
 
-  // Classes conditionnelles pour griser la ligne si elle est désactivée
   const rowClasses = isTrashed
     ? "bg-zinc-100 opacity-50 grayscale dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 pointer-events-none"
     : "border-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 dark:border-zinc-800";
@@ -114,7 +114,6 @@ function Node({ node, style, dragHandle }: any) {
             onClick={(e) => {
               e.stopPropagation();
               node.toggle();
-              // On demande de recalculer la hauteur du parent juste après le toggle !
               recalculateHeight();
             }}
             className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-black cursor-pointer rounded transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-700"
@@ -134,6 +133,27 @@ function Node({ node, style, dragHandle }: any) {
           disabled={isTrashed}
         />
       </div>
+
+      {/* --- NOUVEAU BLOC : ICÔNES --- */}
+      <div className="flex-shrink-0 flex items-center">
+        {node.isInternal ? (
+          // Icône de dossier générique (SVG) pour les nœuds parents
+          <svg className="w-5 h-5 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+        ) : (
+          // Icône de fichier (FileIcon de Cunningham) pour les fichiers finaux
+          <FileIcon
+            file={{
+              title: node.data.label,
+              mimetype: node.data.mimetype || "application/octet-stream"
+            }}
+            type="mini"
+            size="small"
+          />
+        )}
+      </div>
+      {/* ------------------------------ */}
 
       <span className="flex-1 truncate font-medium text-zinc-800 dark:text-zinc-200">
         {node.data.label}
@@ -170,23 +190,18 @@ export default function Home() {
   const [rowTargets, setRowTargets] = useState<Record<string, string>>({});
   const [trashedStates, setTrashedStates] = useState<Record<string, boolean>>({});
 
-  // NOUVEAU : Référence et état pour la hauteur de l'arbre
   const treeRef = useRef<any>(null);
   const [treeHeight, setTreeHeight] = useState(200);
 
-  // Fonction pour ajuster la hauteur de la boîte au pixel près
   const recalculateHeight = () => {
-    // Un léger délai permet à react-arborist de finir d'ouvrir/fermer le dossier
     setTimeout(() => {
       if (treeRef.current) {
-        // Nombre de lignes visibles * 64px de hauteur de ligne
         const newHeight = treeRef.current.visibleNodes.length * 64;
         setTreeHeight(newHeight > 0 ? newHeight : 64);
       }
     }, 10);
   };
 
-  // On calcule la hauteur une première fois au chargement de la page
   useEffect(() => {
     recalculateHeight();
   }, []);
@@ -345,13 +360,13 @@ export default function Home() {
             checkboxStates, toggleNode,
             rowTargets, updateRowTarget,
             trashedStates, toggleTrash,
-            recalculateHeight // On passe la fonction au contexte
+            recalculateHeight
           }}>
             <Tree
-              ref={treeRef} // On lie la ref ici !
+              ref={treeRef}
               initialData={data}
               width="100%"
-              height={treeHeight} // Hauteur calculée dynamiquement en temps réel
+              height={treeHeight}
               rowHeight={64}
               indent={24}
             >
