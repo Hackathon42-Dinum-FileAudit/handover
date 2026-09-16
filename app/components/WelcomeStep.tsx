@@ -11,7 +11,7 @@ export default function WelcomeStep({ onNext }: { onNext: () => void }) {
           title="Outil d'Offboarding"
           subtitle="Bienvenue dans l'interface de gestion des départs de La Suite Numérique. Transférez facilement les droits et auditez les fichiers."
           mainButton={
-            <Button variant="primary" onClick={onNext} size="large">
+            <Button variant="primary" onClick={onNext} size="medium">
               Connexion (Bypass SSO)
             </Button>
           }

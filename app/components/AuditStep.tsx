@@ -1,9 +1,26 @@
 import { useState, createContext, useContext, useRef, useEffect } from "react";
 import { Tree } from "react-arborist";
-import { Select, Button, Checkbox, FileIcon } from "@gouvfr-lasuite/ui-components";
+import { Select, Button, Checkbox, FileIcon, Tooltip } from "@gouvfr-lasuite/ui-components";
 import { ArrowLeftRight, Trash, Undo, Retry, Send } from "@gouvfr-lasuite/ui-components/icons";
 
 const TreeContext = createContext<any>(null);
+
+// --- HELPER : Déduire le MimeType depuis l'extension du fichier ---
+const getMimeType = (filename: string): string => {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'pdf': return 'application/pdf';
+    case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'pptx': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'; // <-- PPTX AJOUTÉ ICI
+    case 'csv': return 'text/csv';
+    case 'png': return 'image/png';
+    case 'mp3': return 'audio/mpeg';
+    case 'zip': return 'application/zip';
+    case 'txt': return 'text/plain';
+    default: return 'application/octet-stream';
+  }
+};
 
 const extractValue = (v: any): string => {
   if (!v) return "";
@@ -32,9 +49,25 @@ function Node({ node, style }: any) {
   const isChecked = cbState === 'checked' || cbState === 'indeterminate';
   const isIndeterminate = cbState === 'indeterminate';
 
+  const isFolder = node.data.type === "folder" || node.isInternal;
+
+  // On récupère le type pour le fichier (FileIcon s'attend toujours à un string)
+  const fileMimeType = getMimeType(node.data.label);
+
   const rowClasses = isTrashed
     ? "bg-zinc-100 opacity-50 grayscale dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 pointer-events-none"
     : "border-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 dark:border-zinc-800";
+
+  // --- LOGIQUE DE TRONCATURE ---
+  const MAX_CHARS = 55;
+  const isLong = node.data.label.length > MAX_CHARS;
+  const displayLabel = isLong ? `${node.data.label.substring(0, MAX_CHARS)}...` : node.data.label;
+
+  const labelElement = (
+    <span className="block truncate font-medium text-zinc-800 dark:text-zinc-200 cursor-default">
+      {displayLabel}
+    </span>
+  );
 
   return (
     <div style={style} className={`flex items-center gap-4 w-full pr-4 group min-w-0 border-b box-border transition-all duration-200 ${rowClasses}`}>
@@ -50,17 +83,31 @@ function Node({ node, style }: any) {
         <Checkbox checked={isChecked} indeterminate={isIndeterminate} onChange={() => toggleNode(node)} disabled={isTrashed} />
       </div>
 
-      <div className="flex-shrink-0 flex items-center">
-        {node.data.type === "folder" || node.isInternal ? (
-          <svg className="w-5 h-5 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+      <div className="flex-shrink-0 flex items-center justify-center w-8 h-8">
+        {isFolder ? (
+          <svg className="w-7 h-7 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
         ) : (
-          <FileIcon file={{ title: node.data.label, mimetype: node.data.mimetype || "application/octet-stream" }} type="mini" size="small" />
+          <FileIcon
+            file={{ title: node.data.label, mimetype: fileMimeType }}
+          />
         )}
       </div>
 
-      <span className="flex-1 truncate font-medium text-zinc-800 dark:text-zinc-200">{node.data.label}</span>
+{/* --- TOOLTIP GÉRÉ VIA LES DESIGN TOKENS --- */}
+      <div className="flex-1 min-w-0">
+        {isLong ? (
+          <Tooltip
+            content={node.data.label}
+            placement="bottom"
+          >
+            {labelElement}
+          </Tooltip>
+        ) : (
+          labelElement
+        )}
+      </div>
 
       <div className={`w-48 sm:w-64 flex-shrink-0 flex items-center ${isTrashed ? 'pointer-events-none' : ''}`}>
         <Select
