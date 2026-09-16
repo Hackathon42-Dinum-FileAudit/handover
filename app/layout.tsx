@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Offboarding",
+  title: "Passation",
   description: "Offboarding tool to simplify ownership transfert",
 };
 

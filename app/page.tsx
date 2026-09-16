@@ -152,7 +152,7 @@ export default function Home() {
           leftIcon={
             <div className="flex items-center gap-3">
               <img src="/logo-fichiers.svg" alt="Logo Passation" className="h-8 w-auto" />
-              <span className="font-semibold text-lg">Offboarding</span>
+              <span className="font-semibold text-lg">Passation</span>
             </div>
           }
           isPanelOpen={false}
