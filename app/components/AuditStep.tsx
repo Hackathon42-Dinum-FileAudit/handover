@@ -1,6 +1,6 @@
 import { useState, createContext, useContext, useRef, useEffect, useMemo } from "react";
 import { Tree } from "react-arborist";
-import { Select, Button, Checkbox, FileIcon, Tooltip, Spinner } from "@gouvfr-lasuite/ui-components";
+import { Select, Button, Checkbox, FileIcon, Tooltip, Spinner, Badge } from "@gouvfr-lasuite/ui-components";
 import { ArrowLeftRight, Trash, Undo, Retry, Send } from "@gouvfr-lasuite/ui-components/icons";
 
 const TreeContext = createContext<any>(null);
@@ -75,16 +75,19 @@ function Node({ node, style }: any) {
   const isFolder = node.data.type === "folder" || node.isInternal;
   const fileMimeType = getMimeType(node.data.label);
 
+  const isSoleOwner = node.data.originalData?.is_sole_owner;
+
   const rowClasses = isTrashed
     ? "bg-zinc-100 opacity-50 grayscale dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 pointer-events-none"
     : "border-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 dark:border-zinc-800";
 
-  const MAX_CHARS = 55;
+  // RETOUR À LA COUPURE JAVASCRIPT : Fiable à 100% avec le Tooltip !
+  const MAX_CHARS = 34;
   const isLong = node.data.label.length > MAX_CHARS;
   const displayLabel = isLong ? `${node.data.label.substring(0, MAX_CHARS)}...` : node.data.label;
 
   const labelElement = (
-    <span className="block truncate font-medium text-zinc-800 dark:text-zinc-200 cursor-default">
+    <span className="block w-full font-medium text-zinc-800 dark:text-zinc-200 cursor-default">
       {displayLabel}
     </span>
   );
@@ -115,6 +118,8 @@ function Node({ node, style }: any) {
           <FileIcon file={{ title: node.data.label, mimetype: fileMimeType }} />
         )}
       </div>
+
+      {/* Colonne NOM */}
       <div className="flex-1 min-w-0">
         {isLong ? (
           <Tooltip content={node.data.label} placement="bottom">{labelElement}</Tooltip>
@@ -122,6 +127,12 @@ function Node({ node, style }: any) {
           labelElement
         )}
       </div>
+
+      {/* Colonne SOLE OWNER */}
+      <div className="w-36 flex-shrink-0 flex items-center">
+        {isSoleOwner && <Badge uppercased type="warning">Sole owner</Badge>}
+      </div>
+
       <div className="w-28 flex-shrink-0 text-sm text-zinc-500 dark:text-zinc-400 truncate">{formattedDate}</div>
       <div className={`w-48 sm:w-64 flex-shrink-0 flex items-center ${isTrashed ? 'pointer-events-none' : ''}`}>
         <Select
@@ -147,6 +158,9 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
   const [trashedStates, setTrashedStates] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const [showOnlySoleOwner, setShowOnlySoleOwner] = useState(false);
+
   const [isAllExpanded, setIsAllExpanded] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const treeRef = useRef<any>(null);
@@ -464,11 +478,18 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
           </div>
           <div className="flex-shrink-0 flex items-center"><Checkbox checked={isAllChecked} indeterminate={isIndeterminate} onChange={handleToggleSelectAll} /></div>
           <div className="flex-shrink-0 flex items-center justify-center w-8 h-8"></div>
+
           <div className="flex-1 min-w-0">
             <button onClick={() => handleSort('name')} className={`flex items-center gap-2 text-sm font-semibold transition-colors ${sortBy === 'name' ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}>
               Name {sortBy === 'name' && (<svg className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>)}
             </button>
           </div>
+
+          <label className="w-36 flex-shrink-0 flex items-center gap-2 cursor-pointer" title="Show only files without other owners">
+            <Checkbox checked={showOnlySoleOwner} onChange={() => setShowOnlySoleOwner(!showOnlySoleOwner)} />
+            <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 whitespace-nowrap">Sole owner</span>
+          </label>
+
           <div className="w-28 flex-shrink-0">
             <button onClick={() => handleSort('date')} className={`flex items-center gap-1 text-sm font-semibold transition-colors whitespace-nowrap ${sortBy === 'date' ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}>
               Last modified {sortBy === 'date' && (<svg className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>)}
@@ -479,7 +500,19 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
         </div>
 
         <TreeContext.Provider value={{ checkboxStates, toggleNode, rowTargets, updateRowTarget, trashedStates, toggleTrash, recalculateHeight }}>
-          <Tree ref={treeRef} data={sortedTreeData} width="100%" height={treeHeight} rowHeight={ROW_HEIGHT} indent={24}>
+          <Tree
+            ref={treeRef}
+            data={sortedTreeData}
+            width="100%"
+            height={treeHeight}
+            rowHeight={ROW_HEIGHT}
+            indent={24}
+            searchTerm={showOnlySoleOwner ? "sole_owner" : ""}
+            searchMatch={(node, term) => {
+              if (!term) return true;
+              return node.data.originalData?.is_sole_owner === true;
+            }}
+          >
             {Node}
           </Tree>
         </TreeContext.Provider>

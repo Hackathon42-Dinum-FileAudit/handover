@@ -7,12 +7,14 @@ import AgentSelectionStep from "./components/AgentSelectionStep";
 import AuditStep from "./components/AuditStep";
 import SuccessStep from "./components/SuccessStep";
 
+// Ajout de is_sole_owner dans l'interface
 interface HandoverAuditItem {
   id: string;
   title: string;
   type: "file" | "folder";
   size: number | null;
   parent_id: string | null;
+  is_sole_owner?: boolean;
 }
 
 const buildTreeFromFlatList = (flatItems: HandoverAuditItem[]): any[] => {
@@ -59,13 +61,13 @@ function Stepper({ currentStep }: { currentStep: number }) {
         return (
           <div key={s} className="flex items-center">
             <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-colors duration-300 ${
-                isActive ? 'bg-semantic-brand-primary text-white shadow-sm' : 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600'
+                isActive ? 'bg-semantic-brand-primary text-white shadow-sm' : 'bg-semantic-neutral-secondary clr-content-semantic-neutral-primary'
               }`}>
               {s}
             </div>
             {!isLast && (
               <div className={`w-10 h-1 mx-1 transition-colors duration-300 rounded-full ${
-                  currentStep > s ? 'bg-semantic-brand-primary' : 'bg-zinc-200 dark:bg-zinc-800'
+                  currentStep > s ? 'bg-semantic-brand-primary' : 'bg-semantic-neutral-secondary'
                 }`} />
             )}
           </div>
@@ -104,15 +106,29 @@ export default function Home() {
     setIsLoading(true);
     setApiError(null);
     try {
-      const response = await fetch(`/api/v1.0/users/${selectedDepartingUser}/handover/audit/`, {
+      const response = await fetch(`/api/v1.0/users/${selectedDepartingUser}/handover/audit`, {
         credentials: "include"
       });
-      if (!response.ok) throw new Error(`Network error (${response.status})`);
+
+      if (!response.ok) {
+        let errorMsg = `Network error (${response.status})`;
+        try {
+          const errorData = await response.json();
+          if (errorData.detail) errorMsg = errorData.detail;
+        } catch (e) {}
+        throw new Error(errorMsg);
+      }
+
       const data = await response.json();
       setTreeData(buildTreeFromFlatList(data.items));
+
     } catch (error: any) {
       console.error("API Error:", error);
-      setApiError("Unable to load agent data. Please check that your Drive server is running.");
+      if (error.message.includes("404") || error.message.includes("Not found")) {
+        setApiError("There are no files left to audit for this agent (handover already complete or invalid agent).");
+      } else {
+        setApiError(error.message || "Unable to load agent data. Please check that your Drive server is running.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -155,7 +171,7 @@ export default function Home() {
                 <p className="text-zinc-500 font-medium animate-pulse">Scanning Drive space...</p>
               </div>
             ) : apiError ? (
-              <div className="bg-red-50 text-red-600 p-6 rounded-lg text-center border border-red-200">
+              <div className="bg-semantic-error-tertiary clr-content-semantic-error-primary p-6 rounded-lg text-center border border-semantic-error-secondary">
                 <p className="font-bold mb-2">Oops!</p>
                 <p>{apiError}</p>
                 <button onClick={() => setStep(1)} className="mt-4 underline font-medium">Back to selection</button>
