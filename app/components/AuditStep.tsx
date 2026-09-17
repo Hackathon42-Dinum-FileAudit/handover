@@ -5,7 +5,7 @@ import { ArrowLeftRight, Trash, Undo, Retry, Send } from "@gouvfr-lasuite/ui-com
 
 const TreeContext = createContext<any>(null);
 
-// --- AGENTS CIBLES (Mise à jour avec les nouveaux test users) ---
+// --- AGENTS CIBLES (Mis à jour) ---
 const TARGET_OPTIONS = [
   { label: 'Line Manager (Auditor)', value: '021d6063-a251-472a-919e-325565b35c49' },
   { label: 'Alice Martin (Successor 1)', value: '2d915b4b-a763-4190-83a9-7380982d561e' },
@@ -13,7 +13,7 @@ const TARGET_OPTIONS = [
   { label: 'Charlie Leroy (Successor 3)', value: '2d915b4b-a763-4190-83a9-7380982d563e' }
 ];
 
-// --- HELPER : Récupérer le cookie CSRF à la manière officielle Django ---
+// --- HELPER : Récupérer le cookie CSRF ---
 const getCookie = (name: string): string => {
   let cookieValue = '';
   if (document.cookie && document.cookie !== '') {
@@ -29,7 +29,7 @@ const getCookie = (name: string): string => {
   return cookieValue;
 };
 
-// --- HELPER : Déduire le MimeType depuis l'extension du fichier ---
+// --- HELPER : MimeType ---
 const getMimeType = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase();
   switch (ext) {
@@ -74,14 +74,12 @@ function Node({ node, style }: any) {
   const isIndeterminate = cbState === 'indeterminate';
 
   const isFolder = node.data.type === "folder" || node.isInternal;
-
   const fileMimeType = getMimeType(node.data.label);
 
   const rowClasses = isTrashed
     ? "bg-zinc-100 opacity-50 grayscale dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 pointer-events-none"
     : "border-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 dark:border-zinc-800";
 
-  // --- TRONCATURE DU NOM ---
   const MAX_CHARS = 55;
   const isLong = node.data.label.length > MAX_CHARS;
   const displayLabel = isLong ? `${node.data.label.substring(0, MAX_CHARS)}...` : node.data.label;
@@ -92,14 +90,14 @@ function Node({ node, style }: any) {
     </span>
   );
 
-  // --- FORMATTAGE DE LA DATE COMPACTE ---
   const rawDate = node.data.originalData?.updated_at;
   const formattedDate = rawDate
     ? new Date(rawDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
     : '--';
 
   return (
-    <div style={style} className={`flex items-center gap-4 w-full pr-4 group min-w-0 border-b box-border transition-all duration-200 ${rowClasses}`}>
+    // Espacement vertical symétrique (py-2.5) pour aérer et éliminer le décalage bas
+    <div style={style} className={`flex items-center gap-4 w-full pr-4 py-2.5 box-border border-b transition-all duration-200 ${rowClasses}`}>
       <div className={`flex items-center h-full ${isTrashed ? 'pointer-events-auto' : ''}`} style={{ paddingLeft: `${node.level * 24}px` }}>
         {node.isInternal ? (
           <button onClick={(e) => { e.stopPropagation(); node.toggle(); recalculateHeight(); }} className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-black cursor-pointer rounded transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-700">
@@ -160,7 +158,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
   const [rowTargets, setRowTargets] = useState<Record<string, string>>({});
   const [trashedStates, setTrashedStates] = useState<Record<string, boolean>>({});
 
-  // --- NOUVEAUX ETATS POUR LE TRI ---
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -168,9 +165,8 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
   const [isSending, setIsSending] = useState(false);
 
   const treeRef = useRef<any>(null);
-  const [treeHeight, setTreeHeight] = useState(200);
+  const [treeHeight, setTreeHeight] = useState(250);
 
-  // --- LOGIQUE DE TRI MULTICOLONNES ---
   const sortedTreeData = useMemo(() => {
     if (!treeData) return [];
     const sortNodes = (nodes: any[]): any[] => {
@@ -179,7 +175,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
           const cmp = a.label.localeCompare(b.label);
           return sortOrder === 'asc' ? cmp : -cmp;
         } else {
-          // Tri par date
           const dateA = a.originalData?.updated_at ? new Date(a.originalData.updated_at).getTime() : 0;
           const dateB = b.originalData?.updated_at ? new Date(b.originalData.updated_at).getTime() : 0;
           const cmp = dateA - dateB;
@@ -214,11 +209,14 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
   const isAllChecked = validNodesCount > 0 && checkedCount >= validNodesCount;
   const isIndeterminate = checkedCount > 0 && !isAllChecked;
 
+  // Hauteur de ligne ajustée à 76px pour correspondre au nouveau padding aéré
+  const ROW_HEIGHT = 76;
+
   const recalculateHeight = () => {
     setTimeout(() => {
       if (treeRef.current) {
-        const newHeight = treeRef.current.visibleNodes.length * 64;
-        setTreeHeight(newHeight > 0 ? newHeight : 64);
+        const newHeight = treeRef.current.visibleNodes.length * ROW_HEIGHT;
+        setTreeHeight(newHeight > 0 ? newHeight : ROW_HEIGHT);
       }
     }, 10);
   };
@@ -429,7 +427,8 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
       </div>
 
       <div className="w-full bg-white rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden">
-        <div className="flex items-center gap-4 w-full pr-4 py-1.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
+        {/* En-tête avec le même padding symétrique (py-2.5) pour un alignement parfait */}
+        <div className="flex items-center gap-4 w-full pr-4 py-2.5 box-border bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
 
           <div className="flex items-center h-full">
             <button
@@ -483,8 +482,9 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
         </div>
 
+        {/* TREE COMPONENT avec rowHeight synchronisé à 76px */}
         <TreeContext.Provider value={{ checkboxStates, toggleNode, rowTargets, updateRowTarget, trashedStates, toggleTrash, recalculateHeight }}>
-          <Tree ref={treeRef} data={sortedTreeData} width="100%" height={treeHeight} rowHeight={64} indent={24}>
+          <Tree ref={treeRef} data={sortedTreeData} width="100%" height={treeHeight} rowHeight={ROW_HEIGHT} indent={24}>
             {Node}
           </Tree>
         </TreeContext.Provider>
