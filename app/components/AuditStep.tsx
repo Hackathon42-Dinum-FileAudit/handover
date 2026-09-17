@@ -91,7 +91,7 @@ function Node({ node, style }: any) {
 
   const rawDate = node.data.originalData?.updated_at;
   const formattedDate = rawDate
-    ? new Date(rawDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+    ? new Date(rawDate).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
     : '--';
 
   return (
@@ -231,7 +231,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
   useEffect(() => { recalculateHeight(); }, [sortedTreeData]);
 
-  // CORRECTION : On traverse les données brutes (node.data) pour cibler même les nœuds fermés/cachés
   const toggleTrash = (node: any) => {
     const willBeTrashed = !trashedStates[node.id];
     const nextTrashed = { ...trashedStates };
@@ -255,7 +254,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
     setCheckboxStates(nextCheckboxes);
   };
 
-  // CORRECTION : Même logique pour les sélections de masse avec les nœuds fermés
   const toggleNode = (node: any) => {
     if (trashedStates[node.id]) return;
     const currentState = checkboxStates[node.id] || 'unchecked';
@@ -346,7 +344,7 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
       const recipientIds = Object.keys(transfersByRecipient);
 
       if (recipientIds.length === 0 && trashedItemIds.length === 0) {
-        alert("Veuillez assigner au moins un fichier à un destinataire ou supprimer un élément pour valider l'opération.");
+        alert("Please assign at least one file to a recipient or delete an item to validate the operation.");
         setIsSending(false);
         return;
       }
@@ -359,7 +357,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
         'X-Requested-With': 'XMLHttpRequest'
       };
 
-      // 1. SÉQUENÇAGE : On attend que tous les transferts soient terminés
       const transferPromises = recipientIds.map((recipientId) => {
         return fetch(`/api/v1.0/users/${departingUserId}/handover/transfer`, {
           method: 'POST',
@@ -379,10 +376,9 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
       const transferResults = await Promise.all(transferPromises);
       if (!transferResults.every(res => res.ok)) {
-        throw new Error("Certains transferts ont échoué. La suppression a été annulée par sécurité.");
+        throw new Error("Some transfers failed. Deletion was cancelled for security reasons.");
       }
 
-      // 2. SÉQUENÇAGE : Une fois les transferts sécurisés, on déclenche les suppressions
       const deletePromises = trashedItemIds.map((itemId) => {
         return fetch(`/api/v1.0/users/${departingUserId}/handover/delete`, {
           method: 'DELETE',
@@ -391,7 +387,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
           body: JSON.stringify({ item_id: itemId, title: nodeLookup[itemId] })
         }).then(async (res) => {
           if (!res.ok) {
-            // Tolérance pour les 404 au cas où un dossier parent a emporté l'enfant dans sa chute
             if (res.status === 404) return { ok: true };
             return { ok: false };
           }
@@ -401,11 +396,11 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
       const deleteResults = await Promise.all(deletePromises);
       if (!deleteResults.every(res => res.ok)) {
-        throw new Error("Certaines opérations de suppression ont échoué côté serveur.");
+        throw new Error("Some deletion operations failed on the server side.");
       }
 
       const reportData = {
-        date: new Date().toLocaleString("fr-FR"),
+        date: new Date().toLocaleString("en-US"),
         auditorEmail: "manager@example.com",
         departingUserName: departingUserName,
         transfers: recipientIds.map(recipientId => ({
@@ -424,8 +419,8 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
       onFinish(reportData);
 
     } catch (error) {
-      console.error("Erreur globale lors de l'envoi :", error);
-      alert("Une erreur est survenue. Ouvrez la console (F12) pour voir les détails de l'erreur Django.");
+      console.error("Global sending error:", error);
+      alert("An error occurred. Open the console (F12) to see Django error details.");
       setIsSending(false);
     }
   };
@@ -435,7 +430,7 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
       <div className="flex flex-wrap justify-between items-center gap-6 bg-white p-5 rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800">
         <div className="flex flex-wrap items-center gap-6">
           <div className="bg-zinc-100 dark:bg-zinc-800 px-4 py-3 rounded border border-zinc-200 dark:border-zinc-700 flex flex-col justify-center min-w-[200px]">
-            <span className="text-xs text-zinc-500 uppercase font-semibold mb-1">Agent audité</span>
+            <span className="text-xs text-zinc-500 uppercase font-semibold mb-1">Audited agent</span>
             <span className="font-medium text-zinc-900 dark:text-white">{departingUserName}</span>
           </div>
 
@@ -455,7 +450,7 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
         <div className="flex flex-wrap items-center gap-4">
           <Button icon={<Retry />} variant="primary" color="warning" onClick={handleReset} disabled={isSending}>Reset</Button>
           <Button icon={isSending ? <Spinner size="sm" /> : <Send />} variant="primary" color="success" onClick={handleSend} disabled={isSending}>
-            {isSending ? "Envoi..." : "Send"}
+            {isSending ? "Sending..." : "Send"}
           </Button>
         </div>
       </div>

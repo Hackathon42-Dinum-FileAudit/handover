@@ -19,15 +19,15 @@ export default function AgentSelectionStep({
 }: any) {
   return (
     <div className="flex flex-col items-center bg-white dark:bg-zinc-900 p-10 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 max-w-lg mx-auto animate-fade-in w-full">
-      <h2 className="text-2xl font-bold mb-4 text-zinc-900 dark:text-white">Sélection de l'agent</h2>
+      <h2 className="text-2xl font-bold mb-4 text-zinc-900 dark:text-white">Agent Selection</h2>
       <p className="text-zinc-600 dark:text-zinc-400 mb-8 text-center">
-        Veuillez sélectionner l'agent sur le départ dont vous souhaitez gérer l'espace.
+        Please select the departing agent whose space you wish to manage.
       </p>
 
       <div className="w-full flex justify-center mb-10">
         <Select
-          label="Agent sortant"
-          value={selectedDepartingUser} // <-- AJOUT DE LA PROP MANQUANTE
+          label="Departing agent"
+          value={selectedDepartingUser}
           onChange={(v: any) => setSelectedDepartingUser(extractValue(v))}
           options={agents}
           searchable
@@ -35,9 +35,9 @@ export default function AgentSelectionStep({
       </div>
 
       <div className="flex w-full justify-between">
-        <Button variant="secondary" onClick={onBack}>Retour</Button>
+        <Button variant="secondary" onClick={onBack}>Back</Button>
         <Button variant="primary" onClick={onNext} disabled={!selectedDepartingUser}>
-          Démarrer l'audit
+          Start audit
         </Button>
       </div>
     </div>

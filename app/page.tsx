@@ -81,11 +81,9 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [treeData, setTreeData] = useState<any[]>([]);
   const [apiError, setApiError] = useState<string | null>(null);
-
-  // NOUVEAU : État pour stocker les données du rapport PDF
   const [reportData, setReportData] = useState<any>(null);
 
-  const departingUserName = AGENTS.find(a => a.value === selectedDepartingUser)?.label || "Agent inconnu";
+  const departingUserName = AGENTS.find(a => a.value === selectedDepartingUser)?.label || "Unknown Agent";
 
   const handleLogin = async () => {
     try {
@@ -96,8 +94,8 @@ export default function Home() {
       });
       setStep(1);
     } catch (error) {
-      console.error("Erreur d'authentification :", error);
-      alert("Impossible de joindre le serveur d'authentification.");
+      console.error("Authentication error:", error);
+      alert("Unable to reach the authentication server.");
     }
   };
 
@@ -109,12 +107,12 @@ export default function Home() {
       const response = await fetch(`/api/v1.0/users/${selectedDepartingUser}/handover/audit/`, {
         credentials: "include"
       });
-      if (!response.ok) throw new Error(`Erreur réseau (${response.status})`);
+      if (!response.ok) throw new Error(`Network error (${response.status})`);
       const data = await response.json();
       setTreeData(buildTreeFromFlatList(data.items));
     } catch (error: any) {
-      console.error("Erreur API:", error);
-      setApiError("Impossible de charger les données de l'agent. Vérifiez que votre serveur Drive tourne bien.");
+      console.error("API Error:", error);
+      setApiError("Unable to load agent data. Please check that your Drive server is running.");
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +124,7 @@ export default function Home() {
         <Header
           leftIcon={
             <div className="flex items-center gap-3">
-              <img src="/logo-passation.svg" alt="Logo Passation" className="h-15 w-auto" />
+              <img src="/logo-passation.svg" alt="Passation Logo" className="h-15 w-auto" />
               <span className="font-semibold text-lg">Passation</span>
             </div>
           }
@@ -154,20 +152,19 @@ export default function Home() {
             {isLoading ? (
               <div className="flex flex-col items-center justify-center flex-1 h-64 gap-4">
                 <Spinner size="lg" />
-                <p className="text-zinc-500 font-medium animate-pulse">Analyse de l'espace Drive en cours...</p>
+                <p className="text-zinc-500 font-medium animate-pulse">Scanning Drive space...</p>
               </div>
             ) : apiError ? (
               <div className="bg-red-50 text-red-600 p-6 rounded-lg text-center border border-red-200">
-                <p className="font-bold mb-2">Oups !</p>
+                <p className="font-bold mb-2">Oops!</p>
                 <p>{apiError}</p>
-                <button onClick={() => setStep(1)} className="mt-4 underline font-medium">Retour à la sélection</button>
+                <button onClick={() => setStep(1)} className="mt-4 underline font-medium">Back to selection</button>
               </div>
             ) : (
               <AuditStep
                 departingUserName={departingUserName}
                 departingUserId={selectedDepartingUser}
                 treeData={treeData}
-                // NOUVEAU : Récupération du reportData
                 onFinish={(data: any) => { setReportData(data); setStep(3); }}
               />
             )}
@@ -175,7 +172,6 @@ export default function Home() {
         )}
 
         {step === 3 && (
-          // NOUVEAU : On passe le reportData au composant SuccessStep
           <SuccessStep
             departingUserName={departingUserName}
             reportData={reportData}
