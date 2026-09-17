@@ -5,7 +5,7 @@ import { ArrowLeftRight, Trash, Undo, Retry, Send } from "@gouvfr-lasuite/ui-com
 
 const TreeContext = createContext<any>(null);
 
-// --- AGENTS CIBLES (Mis à jour) ---
+// --- AGENTS CIBLES ---
 const TARGET_OPTIONS = [
   { label: 'Line Manager (Auditor)', value: '021d6063-a251-472a-919e-325565b35c49' },
   { label: 'Alice Martin (Successor 1)', value: '2d915b4b-a763-4190-83a9-7380982d561e' },
@@ -29,20 +29,23 @@ const getCookie = (name: string): string => {
   return cookieValue;
 };
 
-// --- HELPER : MimeType ---
+// --- HELPER : MimeType précis pour que FileIcon affiche la bonne icône nativement ---
 const getMimeType = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase();
   switch (ext) {
     case 'pdf': return 'application/pdf';
-    case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    case 'pptx': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-    case 'csv': return 'text/csv';
+    case 'docx': case 'doc': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xlsx': case 'xls': case 'csv': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'pptx': case 'ppt': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
     case 'png': return 'image/png';
-    case 'mp3': return 'audio/mpeg';
-    case 'zip': return 'application/zip';
+    case 'jpg': case 'jpeg': return 'image/jpeg';
+    case 'svg': return 'image/svg+xml';
+    case 'gif': return 'image/gif';
+    case 'mp3': case 'wav': return 'audio/mpeg';
+    case 'mp4': case 'avi': return 'video/mp4';
+    case 'zip': case 'rar': case '7z': case 'tar': case 'gz': return 'application/zip';
     case 'txt': return 'text/plain';
-    default: return 'application/octet-stream';
+    default: return 'application/octet-stream'; // Tombera sur "other" proprement
   }
 };
 
@@ -96,7 +99,6 @@ function Node({ node, style }: any) {
     : '--';
 
   return (
-    // Espacement vertical symétrique (py-2.5) pour aérer et éliminer le décalage bas
     <div style={style} className={`flex items-center gap-4 w-full pr-4 py-2.5 box-border border-b transition-all duration-200 ${rowClasses}`}>
       <div className={`flex items-center h-full ${isTrashed ? 'pointer-events-auto' : ''}`} style={{ paddingLeft: `${node.level * 24}px` }}>
         {node.isInternal ? (
@@ -209,7 +211,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
   const isAllChecked = validNodesCount > 0 && checkedCount >= validNodesCount;
   const isIndeterminate = checkedCount > 0 && !isAllChecked;
 
-  // Hauteur de ligne ajustée à 76px pour correspondre au nouveau padding aéré
   const ROW_HEIGHT = 76;
 
   const recalculateHeight = () => {
@@ -427,7 +428,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
       </div>
 
       <div className="w-full bg-white rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden">
-        {/* En-tête avec le même padding symétrique (py-2.5) pour un alignement parfait */}
         <div className="flex items-center gap-4 w-full pr-4 py-2.5 box-border bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
 
           <div className="flex items-center h-full">
@@ -482,7 +482,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
         </div>
 
-        {/* TREE COMPONENT avec rowHeight synchronisé à 76px */}
         <TreeContext.Provider value={{ checkboxStates, toggleNode, rowTargets, updateRowTarget, trashedStates, toggleTrash, recalculateHeight }}>
           <Tree ref={treeRef} data={sortedTreeData} width="100%" height={treeHeight} rowHeight={ROW_HEIGHT} indent={24}>
             {Node}
