@@ -7,7 +7,6 @@ import AgentSelectionStep from "./components/AgentSelectionStep";
 import AuditStep from "./components/AuditStep";
 import SuccessStep from "./components/SuccessStep";
 
-// Ajout de is_sole_owner dans l'interface
 interface HandoverAuditItem {
   id: string;
   title: string;

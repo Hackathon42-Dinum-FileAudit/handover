@@ -81,7 +81,6 @@ function Node({ node, style }: any) {
     ? "bg-zinc-100 opacity-50 grayscale dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 pointer-events-none"
     : "border-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 dark:border-zinc-800";
 
-  // RETOUR À LA COUPURE JAVASCRIPT : Fiable à 100% avec le Tooltip !
   const MAX_CHARS = 34;
   const isLong = node.data.label.length > MAX_CHARS;
   const displayLabel = isLong ? `${node.data.label.substring(0, MAX_CHARS)}...` : node.data.label;
@@ -119,7 +118,6 @@ function Node({ node, style }: any) {
         )}
       </div>
 
-      {/* Colonne NOM */}
       <div className="flex-1 min-w-0">
         {isLong ? (
           <Tooltip content={node.data.label} placement="bottom">{labelElement}</Tooltip>
@@ -128,7 +126,6 @@ function Node({ node, style }: any) {
         )}
       </div>
 
-      {/* Colonne SOLE OWNER */}
       <div className="w-36 flex-shrink-0 flex items-center">
         {isSoleOwner && <Badge uppercased type="warning">Sole owner</Badge>}
       </div>
