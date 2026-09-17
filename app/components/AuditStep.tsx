@@ -101,7 +101,7 @@ function Node({ node, style }: any) {
       {/* --- COLONNE NOM --- */}
       <div className="flex-1 min-w-0">
         {isLong ? (
-          <Tooltip content={node.data.label} placement="bottom" style={{ "--c-tooltip-max-width": "max-content", "--tooltip-max-width": "max-content" } as React.CSSProperties}>
+          <Tooltip content={node.data.label} placement="bottom">
             {labelElement}
           </Tooltip>
         ) : (
