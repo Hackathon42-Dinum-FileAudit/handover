@@ -1,9 +1,33 @@
 import { useState, createContext, useContext, useRef, useEffect, useMemo } from "react";
 import { Tree } from "react-arborist";
-import { Select, Button, Checkbox, FileIcon, Tooltip } from "@gouvfr-lasuite/ui-components";
+import { Select, Button, Checkbox, FileIcon, Tooltip, Spinner } from "@gouvfr-lasuite/ui-components";
 import { ArrowLeftRight, Trash, Undo, Retry, Send } from "@gouvfr-lasuite/ui-components/icons";
 
 const TreeContext = createContext<any>(null);
+
+// --- AGENTS CIBLES (Mise à jour avec les nouveaux test users) ---
+const TARGET_OPTIONS = [
+  { label: 'Line Manager (Auditor)', value: '021d6063-a251-472a-919e-325565b35c49' },
+  { label: 'Alice Martin (Successor 1)', value: '2d915b4b-a763-4190-83a9-7380982d561e' },
+  { label: 'Bob Dupont (Successor 2)', value: '2d915b4b-a763-4190-83a9-7380982d562e' },
+  { label: 'Charlie Leroy (Successor 3)', value: '2d915b4b-a763-4190-83a9-7380982d563e' }
+];
+
+// --- HELPER : Récupérer le cookie CSRF à la manière officielle Django ---
+const getCookie = (name: string): string => {
+  let cookieValue = '';
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+};
 
 // --- HELPER : Déduire le MimeType depuis l'extension du fichier ---
 const getMimeType = (filename: string): string => {
@@ -98,7 +122,6 @@ function Node({ node, style }: any) {
         )}
       </div>
 
-      {/* --- COLONNE NOM --- */}
       <div className="flex-1 min-w-0">
         {isLong ? (
           <Tooltip content={node.data.label} placement="bottom">
@@ -109,20 +132,14 @@ function Node({ node, style }: any) {
         )}
       </div>
 
-      {/* --- COLONNE DATE COMPACTE --- */}
       <div className="w-28 flex-shrink-0 text-sm text-zinc-500 dark:text-zinc-400 truncate">
         {formattedDate}
       </div>
 
-      {/* --- COLONNE ACTIONS --- */}
       <div className={`w-48 sm:w-64 flex-shrink-0 flex items-center ${isTrashed ? 'pointer-events-none' : ''}`}>
         <Select
           label="Select target user"
-          options={[
-            { label: 'Sophie Vigier', value: 'sophie-vigier' },
-            { label: 'Grégoire Martinez', value: 'gregoire-martinez' },
-            { label: 'Monsieur Blackhole', value: 'monsieur-blackhole' }
-          ]}
+          options={TARGET_OPTIONS}
           searchable
           value={rowTargets[node.id] || undefined}
           onChange={(v: any) => updateRowTarget(node.id, extractValue(v))}
@@ -137,34 +154,54 @@ function Node({ node, style }: any) {
   );
 }
 
-export default function AuditStep({ departingUserName, treeData, onFinish }: any) {
+export default function AuditStep({ departingUserName, departingUserId, treeData, onFinish }: any) {
   const [globalTarget, setGlobalTarget] = useState("");
   const [checkboxStates, setCheckboxStates] = useState<Record<string, string>>({});
   const [rowTargets, setRowTargets] = useState<Record<string, string>>({});
   const [trashedStates, setTrashedStates] = useState<Record<string, boolean>>({});
 
+  // --- NOUVEAUX ETATS POUR LE TRI ---
+  const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   const [isAllExpanded, setIsAllExpanded] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   const treeRef = useRef<any>(null);
   const [treeHeight, setTreeHeight] = useState(200);
 
-  // --- LOGIQUE DE TRI ALPHABÉTIQUE ---
+  // --- LOGIQUE DE TRI MULTICOLONNES ---
   const sortedTreeData = useMemo(() => {
     if (!treeData) return [];
     const sortNodes = (nodes: any[]): any[] => {
       return [...nodes].sort((a, b) => {
-        const cmp = a.label.localeCompare(b.label);
-        return sortOrder === 'asc' ? cmp : -cmp;
+        if (sortBy === 'name') {
+          const cmp = a.label.localeCompare(b.label);
+          return sortOrder === 'asc' ? cmp : -cmp;
+        } else {
+          // Tri par date
+          const dateA = a.originalData?.updated_at ? new Date(a.originalData.updated_at).getTime() : 0;
+          const dateB = b.originalData?.updated_at ? new Date(b.originalData.updated_at).getTime() : 0;
+          const cmp = dateA - dateB;
+          return sortOrder === 'asc' ? cmp : -cmp;
+        }
       }).map(n => ({
         ...n,
         children: n.children ? sortNodes(n.children) : undefined
       }));
     };
     return sortNodes(treeData);
-  }, [treeData, sortOrder]);
+  }, [treeData, sortBy, sortOrder]);
 
-  // --- ÉTAT DE LA CHECKBOX GLOBALE ---
+  const handleSort = (column: 'name' | 'date') => {
+    if (sortBy === column) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
   const totalSelectableNodes = useMemo(() => {
     const countNodes = (nodes: any[]): number => {
       return nodes.reduce((acc, node) => acc + 1 + (node.children ? countNodes(node.children) : 0), 0);
@@ -236,7 +273,6 @@ export default function AuditStep({ departingUserName, treeData, onFinish }: any
     setCheckboxStates(nextStates);
   };
 
-  // --- SÉLECTION GLOBALE ---
   const handleToggleSelectAll = () => {
     if (isAllChecked) {
       setCheckboxStates({});
@@ -285,6 +321,77 @@ export default function AuditStep({ departingUserName, treeData, onFinish }: any
     setGlobalTarget("");
   };
 
+  const handleSend = async () => {
+    setIsSending(true);
+
+    try {
+      const transfersByRecipient: Record<string, string[]> = {};
+
+      Object.entries(rowTargets).forEach(([itemId, recipientId]) => {
+        if (recipientId && !trashedStates[itemId]) {
+          if (!transfersByRecipient[recipientId]) {
+            transfersByRecipient[recipientId] = [];
+          }
+          transfersByRecipient[recipientId].push(itemId);
+        }
+      });
+
+      const recipientIds = Object.keys(transfersByRecipient);
+
+      if (recipientIds.length === 0) {
+        alert("Veuillez assigner au moins un fichier à un destinataire pour effectuer un transfert.");
+        setIsSending(false);
+        return;
+      }
+
+      const csrfToken = getCookie('csrftoken');
+      if (!csrfToken) {
+        console.warn("Attention: Aucun cookie 'csrftoken' trouvé dans le navigateur.");
+      }
+
+      const apiPromises = recipientIds.map((recipientId) => {
+        return fetch(`/api/v1.0/users/${departingUserId}/handover/transfer/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            recipient_id: recipientId,
+            item_ids: transfersByRecipient[recipientId],
+            dry_run: false,
+            reallocate_storage_quota: true
+          })
+        });
+      });
+
+      const results = await Promise.all(apiPromises);
+
+      let hasError = false;
+      for (const res of results) {
+        if (!res.ok) {
+          hasError = true;
+          const errorText = await res.text();
+          console.error(`❌ Erreur ${res.status} de l'API Django :`, errorText);
+        }
+      }
+
+      if (hasError) {
+        throw new Error("Certains transferts ont été bloqués par le serveur.");
+      }
+
+      onFinish();
+
+    } catch (error) {
+      console.error("Erreur globale lors du transfert :", error);
+      alert("Une erreur est survenue. Ouvrez la console (F12) pour voir les détails de l'erreur Django.");
+      setIsSending(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 w-full animate-fade-in">
       <div className="flex flex-wrap justify-between items-center gap-6 bg-white p-5 rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800">
@@ -299,11 +406,7 @@ export default function AuditStep({ departingUserName, treeData, onFinish }: any
               label="Select target user"
               value={globalTarget || undefined}
               onChange={(v: any) => setGlobalTarget(extractValue(v))}
-              options={[
-                { label: 'Sophie Vigier', value: 'sophie-vigier' },
-                { label: 'Grégoire Martinez', value: 'gregoire-martinez' },
-                { label: 'Monsieur Blackhole', value: 'monsieur-blackhole' }
-              ]}
+              options={TARGET_OPTIONS}
               searchable
             />
           </div>
@@ -312,18 +415,22 @@ export default function AuditStep({ departingUserName, treeData, onFinish }: any
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <Button icon={<Retry />} variant="primary" color="warning" onClick={handleReset}>Reset</Button>
-          <Button icon={<Send />} variant="primary" color="success" onClick={onFinish}>Send</Button>
+          <Button icon={<Retry />} variant="primary" color="warning" onClick={handleReset} disabled={isSending}>Reset</Button>
+          <Button
+            icon={isSending ? <Spinner size="sm" /> : <Send />}
+            variant="primary"
+            color="success"
+            onClick={handleSend}
+            disabled={isSending}
+          >
+            {isSending ? "Envoi..." : "Send"}
+          </Button>
         </div>
       </div>
 
       <div className="w-full bg-white rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden">
-
-        {/* --- HEADER ALIGNÉ EXACTEMENT SUR LA GRILLE DU TREE --- */}
-        {/* Changement : py-1.5 pour réduire la hauteur globale de la barre */}
         <div className="flex items-center gap-4 w-full pr-4 py-1.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
 
-          {/* 1. Chevron global */}
           <div className="flex items-center h-full">
             <button
               onClick={handleToggleExpandAll}
@@ -334,7 +441,6 @@ export default function AuditStep({ departingUserName, treeData, onFinish }: any
             </button>
           </div>
 
-          {/* 2. Checkbox globale */}
           <div className="flex-shrink-0 flex items-center">
             <Checkbox
               checked={isAllChecked}
@@ -343,46 +449,45 @@ export default function AuditStep({ departingUserName, treeData, onFinish }: any
             />
           </div>
 
-          {/* 3. Espaceur pour l'icône de fichier */}
           <div className="flex-shrink-0 flex items-center justify-center w-8 h-8"></div>
 
-          {/* 4. En-tête : Name */}
           <div className="flex-1 min-w-0">
             <button
-              onClick={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')}
-              className="flex items-center gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              onClick={() => handleSort('name')}
+              className={`flex items-center gap-2 text-sm font-semibold transition-colors ${sortBy === 'name' ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
             >
               Name
-              <svg className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+              {sortBy === 'name' && (
+                <svg className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+              )}
             </button>
           </div>
 
-          {/* 5. En-tête : Last modified */}
           <div className="w-28 flex-shrink-0">
-            {/* Changement : gap-1, whitespace-nowrap et suppression du SVG de l'horloge */}
-            <button className="flex items-center gap-1 text-sm font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap">
+            <button
+              onClick={() => handleSort('date')}
+              className={`flex items-center gap-1 text-sm font-semibold transition-colors whitespace-nowrap ${sortBy === 'date' ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+            >
               Last modified
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+              {sortBy === 'date' && (
+                <svg className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+              )}
             </button>
           </div>
 
-          {/* 6. Espaceur pour Select Target */}
           <div className="w-48 sm:w-64 flex-shrink-0 flex items-center"></div>
 
-          {/* 7. Espaceur pour Corbeille (Invisible pour garder l'alignement de fin de ligne) */}
           <div className="flex-shrink-0 flex items-center opacity-0 pointer-events-none">
              <DeleteButton isTrashed={false} onToggle={() => {}} />
           </div>
 
         </div>
 
-        {/* TREE COMPONENT */}
         <TreeContext.Provider value={{ checkboxStates, toggleNode, rowTargets, updateRowTarget, trashedStates, toggleTrash, recalculateHeight }}>
           <Tree ref={treeRef} data={sortedTreeData} width="100%" height={treeHeight} rowHeight={64} indent={24}>
             {Node}
           </Tree>
         </TreeContext.Provider>
-
       </div>
     </div>
   );

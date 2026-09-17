@@ -24,10 +24,10 @@ export default function AgentSelectionStep({
         Veuillez sélectionner l'agent sur le départ dont vous souhaitez gérer l'espace.
       </p>
 
-      <div className="w-full mb-10">
+      {/* Utilisation pure de Flexbox pour centrer le composant tel qu'il est */}
+      <div className="w-full flex justify-center mb-10">
         <Select
           label="Agent sortant"
-          value={selectedDepartingUser}
           onChange={(v: any) => setSelectedDepartingUser(extractValue(v))}
           options={agents}
           searchable
