@@ -29,7 +29,7 @@ const getCookie = (name: string): string => {
   return cookieValue;
 };
 
-// --- HELPER : MimeType précis pour que FileIcon affiche la bonne icône nativement ---
+// --- HELPER : MimeType précis ---
 const getMimeType = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase();
   switch (ext) {
@@ -45,7 +45,7 @@ const getMimeType = (filename: string): string => {
     case 'mp4': case 'avi': return 'video/mp4';
     case 'zip': case 'rar': case '7z': case 'tar': case 'gz': return 'application/zip';
     case 'txt': return 'text/plain';
-    default: return 'application/octet-stream'; // Tombera sur "other" proprement
+    default: return 'application/octet-stream';
   }
 };
 
@@ -168,6 +168,19 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
   const treeRef = useRef<any>(null);
   const [treeHeight, setTreeHeight] = useState(250);
+
+  // --- LOOKUP TABLE : Pour récupérer le titre exact d'un fichier via son ID ---
+  const nodeLookup = useMemo(() => {
+    const map: Record<string, string> = {};
+    const traverse = (nodes: any[]) => {
+      nodes.forEach(n => {
+        map[n.id] = n.label;
+        if (n.children) traverse(n.children);
+      });
+    };
+    traverse(treeData || []);
+    return map;
+  }, [treeData]);
 
   const sortedTreeData = useMemo(() => {
     if (!treeData) return [];
@@ -325,6 +338,7 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
     try {
       const transfersByRecipient: Record<string, string[]> = {};
+      const trashedItemIds = Object.keys(trashedStates).filter(id => trashedStates[id]);
 
       Object.entries(rowTargets).forEach(([itemId, recipientId]) => {
         if (recipientId && !trashedStates[itemId]) {
@@ -337,8 +351,8 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
       const recipientIds = Object.keys(transfersByRecipient);
 
-      if (recipientIds.length === 0) {
-        alert("Veuillez assigner au moins un fichier à un destinataire pour effectuer un transfert.");
+      if (recipientIds.length === 0 && trashedItemIds.length === 0) {
+        alert("Veuillez assigner au moins un fichier à un destinataire ou supprimer un élément pour valider l'opération.");
         setIsSending(false);
         return;
       }
@@ -348,15 +362,18 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
         console.warn("Attention: Aucun cookie 'csrftoken' trouvé dans le navigateur.");
       }
 
-      const apiPromises = recipientIds.map((recipientId) => {
-        return fetch(`/api/v1.0/users/${departingUserId}/handover/transfer/`, {
+      const commonHeaders = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest'
+      };
+
+      // 1. Préparation des requêtes de transfert (POST) - SANS slash final pour éviter la redirection 308
+      const transferPromises = recipientIds.map((recipientId) => {
+        return fetch(`/api/v1.0/users/${departingUserId}/handover/transfer`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-CSRFToken': csrfToken,
-            'X-Requested-With': 'XMLHttpRequest'
-          },
+          headers: commonHeaders,
           credentials: 'include',
           body: JSON.stringify({
             recipient_id: recipientId,
@@ -364,28 +381,53 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
             dry_run: false,
             reallocate_storage_quota: true
           })
+        }).then(async (res) => {
+          if (!res.ok) {
+            const errorText = await res.text();
+            console.error(`❌ Erreur ${res.status} de l'API Django (Transfert) :`, errorText);
+            return { ok: false };
+          }
+          return { ok: true };
         });
       });
 
-      const results = await Promise.all(apiPromises);
+      // 2. Préparation des requêtes de suppression (DELETE) - SANS slash final
+      const deletePromises = trashedItemIds.map((itemId) => {
+        return fetch(`/api/v1.0/users/${departingUserId}/handover/delete`, {
+          method: 'DELETE',
+          headers: commonHeaders,
+          credentials: 'include',
+          body: JSON.stringify({
+            item_id: itemId,
+            title: nodeLookup[itemId]
+          })
+        }).then(async (res) => {
+          if (!res.ok) {
+            // Un 404 signifie que le fichier n'existe plus (ex: supprimé en cascade avec son dossier parent)
+            if (res.status === 404) {
+              console.info(`ℹ️ Info: Fichier/Dossier ${nodeLookup[itemId]} déjà supprimé (Ignoré)`);
+              return { ok: true };
+            }
+            const errorText = await res.text();
+            console.error(`❌ Erreur ${res.status} de l'API Django (Suppression) :`, errorText);
+            return { ok: false };
+          }
+          return { ok: true };
+        });
+      });
 
-      let hasError = false;
-      for (const res of results) {
-        if (!res.ok) {
-          hasError = true;
-          const errorText = await res.text();
-          console.error(`❌ Erreur ${res.status} de l'API Django :`, errorText);
-        }
-      }
+      // 3. Exécution groupée de l'ensemble des appels API
+      const results = await Promise.all([...transferPromises, ...deletePromises]);
+      const allOk = results.every(res => res.ok);
 
-      if (hasError) {
-        throw new Error("Certains transferts ont été bloqués par le serveur.");
+      if (!allOk) {
+        throw new Error("Certaines opérations (transferts ou suppressions) ont échoué côté serveur.");
       }
 
       onFinish();
 
     } catch (error) {
-      console.error("Erreur globale lors du transfert :", error);
+      console.error("Erreur globale lors de l'envoi :", error);
       alert("Une erreur est survenue. Ouvrez la console (F12) pour voir les détails de l'erreur Django.");
       setIsSending(false);
     }

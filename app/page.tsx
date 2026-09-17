@@ -85,7 +85,9 @@ function Stepper({ currentStep }: { currentStep: number }) {
 
 export default function Home() {
   const [step, setStep] = useState(0);
-  const [selectedDepartingUser, setSelectedDepartingUser] = useState(AGENTS[0].value);
+
+  // INITIALISATION À VIDE ICI :
+  const [selectedDepartingUser, setSelectedDepartingUser] = useState("");
 
   const [isLoading, setIsLoading] = useState(false);
   const [treeData, setTreeData] = useState<any[]>([]);
@@ -178,7 +180,7 @@ export default function Home() {
             ) : (
               <AuditStep
                 departingUserName={departingUserName}
-                departingUserId={selectedDepartingUser} // <-- AJOUT DE L'ID ICI
+                departingUserId={selectedDepartingUser}
                 treeData={treeData}
                 onFinish={() => setStep(3)}
               />
@@ -187,7 +189,8 @@ export default function Home() {
         )}
 
         {step === 3 && (
-          <SuccessStep departingUserName={departingUserName} onReset={() => { setStep(0); setSelectedDepartingUser(AGENTS[0].value); setTreeData([]); }} />
+          // RESET À VIDE ICI AUSSI :
+          <SuccessStep departingUserName={departingUserName} onReset={() => { setStep(0); setSelectedDepartingUser(""); setTreeData([]); }} />
         )}
       </main>
 
