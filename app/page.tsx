@@ -7,7 +7,6 @@ import AgentSelectionStep from "./components/AgentSelectionStep";
 import AuditStep from "./components/AuditStep";
 import SuccessStep from "./components/SuccessStep";
 
-// --- TYPESCRIPT INTERFACES ---
 interface HandoverAuditItem {
   id: string;
   title: string;
@@ -16,13 +15,10 @@ interface HandoverAuditItem {
   parent_id: string | null;
 }
 
-// --- FONCTION DE TRANSFORMATION (Flat List -> Nested Tree) ---
 const buildTreeFromFlatList = (flatItems: HandoverAuditItem[]): any[] => {
   if (!flatItems || flatItems.length === 0) return [];
-
   const itemMap: Record<string, any> = {};
   const rootNodes: any[] = [];
-
   flatItems.forEach(item => {
     itemMap[item.id] = {
       id: String(item.id),
@@ -33,7 +29,6 @@ const buildTreeFromFlatList = (flatItems: HandoverAuditItem[]): any[] => {
       originalData: item
     };
   });
-
   flatItems.forEach(item => {
     const currentNode = itemMap[item.id];
     if (item.parent_id && itemMap[item.parent_id]) {
@@ -44,11 +39,9 @@ const buildTreeFromFlatList = (flatItems: HandoverAuditItem[]): any[] => {
       rootNodes.push(currentNode);
     }
   });
-
   return rootNodes;
 };
 
-// --- AGENTS DISPONIBLES POUR LE HACKATHON ---
 const AGENTS = [
   { label: 'John Doe', value: '2c6c1f9f-9b0a-46b9-be85-d63983d1a750' },
   { label: 'Peter Parker', value: 'peter-parker' },
@@ -58,7 +51,6 @@ const AGENTS = [
 function Stepper({ currentStep }: { currentStep: number }) {
   if (currentStep === 0) return null;
   const steps = [1, 2, 3];
-
   return (
     <div className="absolute right-6 top-1/2 -translate-y-1/2 z-50 flex items-center">
       {steps.map((s, index) => {
@@ -85,13 +77,13 @@ function Stepper({ currentStep }: { currentStep: number }) {
 
 export default function Home() {
   const [step, setStep] = useState(0);
-
-  // INITIALISATION À VIDE ICI :
   const [selectedDepartingUser, setSelectedDepartingUser] = useState("");
-
   const [isLoading, setIsLoading] = useState(false);
   const [treeData, setTreeData] = useState<any[]>([]);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // NOUVEAU : État pour stocker les données du rapport PDF
+  const [reportData, setReportData] = useState<any>(null);
 
   const departingUserName = AGENTS.find(a => a.value === selectedDepartingUser)?.label || "Agent inconnu";
 
@@ -113,20 +105,13 @@ export default function Home() {
     setStep(2);
     setIsLoading(true);
     setApiError(null);
-
     try {
       const response = await fetch(`/api/v1.0/users/${selectedDepartingUser}/handover/audit/`, {
         credentials: "include"
       });
-
-      if (!response.ok) {
-        throw new Error(`Erreur réseau (${response.status})`);
-      }
-
+      if (!response.ok) throw new Error(`Erreur réseau (${response.status})`);
       const data = await response.json();
-      const formattedTree = buildTreeFromFlatList(data.items);
-      setTreeData(formattedTree);
-
+      setTreeData(buildTreeFromFlatList(data.items));
     } catch (error: any) {
       console.error("Erreur API:", error);
       setApiError("Impossible de charger les données de l'agent. Vérifiez que votre serveur Drive tourne bien.");
@@ -182,15 +167,20 @@ export default function Home() {
                 departingUserName={departingUserName}
                 departingUserId={selectedDepartingUser}
                 treeData={treeData}
-                onFinish={() => setStep(3)}
+                // NOUVEAU : Récupération du reportData
+                onFinish={(data: any) => { setReportData(data); setStep(3); }}
               />
             )}
           </>
         )}
 
         {step === 3 && (
-          // RESET À VIDE ICI AUSSI :
-          <SuccessStep departingUserName={departingUserName} onReset={() => { setStep(0); setSelectedDepartingUser(""); setTreeData([]); }} />
+          // NOUVEAU : On passe le reportData au composant SuccessStep
+          <SuccessStep
+            departingUserName={departingUserName}
+            reportData={reportData}
+            onReset={() => { setStep(0); setSelectedDepartingUser(""); setTreeData([]); setReportData(null); }}
+          />
         )}
       </main>
 

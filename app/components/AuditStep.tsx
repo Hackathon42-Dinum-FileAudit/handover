@@ -5,7 +5,6 @@ import { ArrowLeftRight, Trash, Undo, Retry, Send } from "@gouvfr-lasuite/ui-com
 
 const TreeContext = createContext<any>(null);
 
-// --- AGENTS CIBLES ---
 const TARGET_OPTIONS = [
   { label: 'Line Manager (Auditor)', value: '021d6063-a251-472a-919e-325565b35c49' },
   { label: 'Alice Martin (Successor 1)', value: '2d915b4b-a763-4190-83a9-7380982d561e' },
@@ -13,7 +12,6 @@ const TARGET_OPTIONS = [
   { label: 'Charlie Leroy (Successor 3)', value: '2d915b4b-a763-4190-83a9-7380982d563e' }
 ];
 
-// --- HELPER : Récupérer le cookie CSRF ---
 const getCookie = (name: string): string => {
   let cookieValue = '';
   if (document.cookie && document.cookie !== '') {
@@ -29,7 +27,6 @@ const getCookie = (name: string): string => {
   return cookieValue;
 };
 
-// --- HELPER : MimeType précis ---
 const getMimeType = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase();
   switch (ext) {
@@ -75,7 +72,6 @@ function Node({ node, style }: any) {
   const cbState = checkboxStates[node.id] || 'unchecked';
   const isChecked = cbState === 'checked' || cbState === 'indeterminate';
   const isIndeterminate = cbState === 'indeterminate';
-
   const isFolder = node.data.type === "folder" || node.isInternal;
   const fileMimeType = getMimeType(node.data.label);
 
@@ -107,11 +103,9 @@ function Node({ node, style }: any) {
           </button>
         ) : <span className="w-8 h-8"></span>}
       </div>
-
       <div className={`flex-shrink-0 flex items-center ${isTrashed ? 'pointer-events-none' : ''}`}>
         <Checkbox checked={isChecked} indeterminate={isIndeterminate} onChange={() => toggleNode(node)} disabled={isTrashed} />
       </div>
-
       <div className="flex-shrink-0 flex items-center justify-center w-8 h-8">
         {isFolder ? (
           <svg className="w-7 h-7 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -121,21 +115,14 @@ function Node({ node, style }: any) {
           <FileIcon file={{ title: node.data.label, mimetype: fileMimeType }} />
         )}
       </div>
-
       <div className="flex-1 min-w-0">
         {isLong ? (
-          <Tooltip content={node.data.label} placement="bottom">
-            {labelElement}
-          </Tooltip>
+          <Tooltip content={node.data.label} placement="bottom">{labelElement}</Tooltip>
         ) : (
           labelElement
         )}
       </div>
-
-      <div className="w-28 flex-shrink-0 text-sm text-zinc-500 dark:text-zinc-400 truncate">
-        {formattedDate}
-      </div>
-
+      <div className="w-28 flex-shrink-0 text-sm text-zinc-500 dark:text-zinc-400 truncate">{formattedDate}</div>
       <div className={`w-48 sm:w-64 flex-shrink-0 flex items-center ${isTrashed ? 'pointer-events-none' : ''}`}>
         <Select
           label="Select target user"
@@ -146,7 +133,6 @@ function Node({ node, style }: any) {
           disabled={isTrashed}
         />
       </div>
-
       <div className="flex-shrink-0 flex items-center pointer-events-auto">
         <DeleteButton isTrashed={isTrashed} onToggle={() => toggleTrash(node)} />
       </div>
@@ -159,17 +145,13 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
   const [checkboxStates, setCheckboxStates] = useState<Record<string, string>>({});
   const [rowTargets, setRowTargets] = useState<Record<string, string>>({});
   const [trashedStates, setTrashedStates] = useState<Record<string, boolean>>({});
-
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
   const [isAllExpanded, setIsAllExpanded] = useState(false);
   const [isSending, setIsSending] = useState(false);
-
   const treeRef = useRef<any>(null);
   const [treeHeight, setTreeHeight] = useState(250);
 
-  // --- LOOKUP TABLE : Pour récupérer le titre exact d'un fichier via son ID ---
   const nodeLookup = useMemo(() => {
     const map: Record<string, string> = {};
     const traverse = (nodes: any[]) => {
@@ -179,6 +161,19 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
       });
     };
     traverse(treeData || []);
+    return map;
+  }, [treeData]);
+
+  const itemPaths = useMemo(() => {
+    const map: Record<string, string> = {};
+    const traverse = (nodes: any[], currentPath: string) => {
+      nodes.forEach(n => {
+        const nodePath = currentPath ? `${currentPath} / ${n.label}` : n.label;
+        map[n.id] = nodePath;
+        if (n.children) traverse(n.children, nodePath);
+      });
+    };
+    traverse(treeData || [], "");
     return map;
   }, [treeData]);
 
@@ -223,7 +218,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
   const validNodesCount = totalSelectableNodes - Object.values(trashedStates).filter(Boolean).length;
   const isAllChecked = validNodesCount > 0 && checkedCount >= validNodesCount;
   const isIndeterminate = checkedCount > 0 && !isAllChecked;
-
   const ROW_HEIGHT = 76;
 
   const recalculateHeight = () => {
@@ -235,28 +229,33 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
     }, 10);
   };
 
-  useEffect(() => {
-    recalculateHeight();
-  }, [sortedTreeData]);
+  useEffect(() => { recalculateHeight(); }, [sortedTreeData]);
 
+  // CORRECTION : On traverse les données brutes (node.data) pour cibler même les nœuds fermés/cachés
   const toggleTrash = (node: any) => {
     const willBeTrashed = !trashedStates[node.id];
     const nextTrashed = { ...trashedStates };
     const nextTargets = { ...rowTargets };
     const nextCheckboxes = { ...checkboxStates };
 
-    const applyTrashToNodeAndChildren = (n: any) => {
-      nextTrashed[n.id] = willBeTrashed;
-      if (willBeTrashed) { delete nextTargets[n.id]; nextCheckboxes[n.id] = 'unchecked'; }
-      if (n.children && n.children.length > 0) { n.children.forEach((child: any) => applyTrashToNodeAndChildren(child)); }
+    const applyTrashToData = (dataNode: any) => {
+      nextTrashed[dataNode.id] = willBeTrashed;
+      if (willBeTrashed) {
+        delete nextTargets[dataNode.id];
+        nextCheckboxes[dataNode.id] = 'unchecked';
+      }
+      if (dataNode.children && dataNode.children.length > 0) {
+        dataNode.children.forEach((child: any) => applyTrashToData(child));
+      }
     };
 
-    applyTrashToNodeAndChildren(node);
+    applyTrashToData(node.data);
     setTrashedStates(nextTrashed);
     setRowTargets(nextTargets);
     setCheckboxStates(nextCheckboxes);
   };
 
+  // CORRECTION : Même logique pour les sélections de masse avec les nœuds fermés
   const toggleNode = (node: any) => {
     if (trashedStates[node.id]) return;
     const currentState = checkboxStates[node.id] || 'unchecked';
@@ -270,9 +269,9 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
     const nextStates = { ...checkboxStates };
     nextStates[node.id] = newState;
 
-    const setChildrenState = (n: any, stateToSet: string) => {
-      if (n.children && n.children.length > 0) {
-        n.children.forEach((child: any) => {
+    const setChildrenState = (dataNode: any, stateToSet: string) => {
+      if (dataNode.children && dataNode.children.length > 0) {
+        dataNode.children.forEach((child: any) => {
           if (!trashedStates[child.id]) {
             nextStates[child.id] = stateToSet;
             setChildrenState(child, stateToSet);
@@ -281,7 +280,7 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
       }
     };
 
-    setChildrenState(node, childState);
+    setChildrenState(node.data, childState);
     setCheckboxStates(nextStates);
   };
 
@@ -303,11 +302,7 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
   const handleToggleExpandAll = () => {
     if (!treeRef.current) return;
-    if (isAllExpanded) {
-      treeRef.current.closeAll();
-    } else {
-      treeRef.current.openAll();
-    }
+    if (isAllExpanded) { treeRef.current.closeAll(); } else { treeRef.current.openAll(); }
     setIsAllExpanded(!isAllExpanded);
     recalculateHeight();
   };
@@ -335,7 +330,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
   const handleSend = async () => {
     setIsSending(true);
-
     try {
       const transfersByRecipient: Record<string, string[]> = {};
       const trashedItemIds = Object.keys(trashedStates).filter(id => trashedStates[id]);
@@ -358,10 +352,6 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
       }
 
       const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        console.warn("Attention: Aucun cookie 'csrftoken' trouvé dans le navigateur.");
-      }
-
       const commonHeaders = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -369,7 +359,7 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
         'X-Requested-With': 'XMLHttpRequest'
       };
 
-      // 1. Préparation des requêtes de transfert (POST) - SANS slash final pour éviter la redirection 308
+      // 1. SÉQUENÇAGE : On attend que tous les transferts soient terminés
       const transferPromises = recipientIds.map((recipientId) => {
         return fetch(`/api/v1.0/users/${departingUserId}/handover/transfer`, {
           method: 'POST',
@@ -382,49 +372,56 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
             reallocate_storage_quota: true
           })
         }).then(async (res) => {
-          if (!res.ok) {
-            const errorText = await res.text();
-            console.error(`❌ Erreur ${res.status} de l'API Django (Transfert) :`, errorText);
-            return { ok: false };
-          }
+          if (!res.ok) { return { ok: false }; }
           return { ok: true };
         });
       });
 
-      // 2. Préparation des requêtes de suppression (DELETE) - SANS slash final
+      const transferResults = await Promise.all(transferPromises);
+      if (!transferResults.every(res => res.ok)) {
+        throw new Error("Certains transferts ont échoué. La suppression a été annulée par sécurité.");
+      }
+
+      // 2. SÉQUENÇAGE : Une fois les transferts sécurisés, on déclenche les suppressions
       const deletePromises = trashedItemIds.map((itemId) => {
         return fetch(`/api/v1.0/users/${departingUserId}/handover/delete`, {
           method: 'DELETE',
           headers: commonHeaders,
           credentials: 'include',
-          body: JSON.stringify({
-            item_id: itemId,
-            title: nodeLookup[itemId]
-          })
+          body: JSON.stringify({ item_id: itemId, title: nodeLookup[itemId] })
         }).then(async (res) => {
           if (!res.ok) {
-            // Un 404 signifie que le fichier n'existe plus (ex: supprimé en cascade avec son dossier parent)
-            if (res.status === 404) {
-              console.info(`ℹ️ Info: Fichier/Dossier ${nodeLookup[itemId]} déjà supprimé (Ignoré)`);
-              return { ok: true };
-            }
-            const errorText = await res.text();
-            console.error(`❌ Erreur ${res.status} de l'API Django (Suppression) :`, errorText);
+            // Tolérance pour les 404 au cas où un dossier parent a emporté l'enfant dans sa chute
+            if (res.status === 404) return { ok: true };
             return { ok: false };
           }
           return { ok: true };
         });
       });
 
-      // 3. Exécution groupée de l'ensemble des appels API
-      const results = await Promise.all([...transferPromises, ...deletePromises]);
-      const allOk = results.every(res => res.ok);
-
-      if (!allOk) {
-        throw new Error("Certaines opérations (transferts ou suppressions) ont échoué côté serveur.");
+      const deleteResults = await Promise.all(deletePromises);
+      if (!deleteResults.every(res => res.ok)) {
+        throw new Error("Certaines opérations de suppression ont échoué côté serveur.");
       }
 
-      onFinish();
+      const reportData = {
+        date: new Date().toLocaleString("fr-FR"),
+        auditorEmail: "manager@example.com",
+        departingUserName: departingUserName,
+        transfers: recipientIds.map(recipientId => ({
+          recipientName: TARGET_OPTIONS.find(o => o.value === recipientId)?.label || recipientId,
+          items: transfersByRecipient[recipientId].map(itemId => ({
+            title: nodeLookup[itemId],
+            path: itemPaths[itemId]
+          }))
+        })),
+        deletions: trashedItemIds.map(itemId => ({
+          title: nodeLookup[itemId],
+          path: itemPaths[itemId]
+        }))
+      };
+
+      onFinish(reportData);
 
     } catch (error) {
       console.error("Erreur globale lors de l'envoi :", error);
@@ -457,13 +454,7 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
         <div className="flex flex-wrap items-center gap-4">
           <Button icon={<Retry />} variant="primary" color="warning" onClick={handleReset} disabled={isSending}>Reset</Button>
-          <Button
-            icon={isSending ? <Spinner size="sm" /> : <Send />}
-            variant="primary"
-            color="success"
-            onClick={handleSend}
-            disabled={isSending}
-          >
+          <Button icon={isSending ? <Spinner size="sm" /> : <Send />} variant="primary" color="success" onClick={handleSend} disabled={isSending}>
             {isSending ? "Envoi..." : "Send"}
           </Button>
         </div>
@@ -471,57 +462,25 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
 
       <div className="w-full bg-white rounded-lg shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden">
         <div className="flex items-center gap-4 w-full pr-4 py-2.5 box-border bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
-
           <div className="flex items-center h-full">
-            <button
-              onClick={handleToggleExpandAll}
-              className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-black cursor-pointer rounded transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-700"
-              title={isAllExpanded ? "Tout replier" : "Tout déplier"}
-            >
+            <button onClick={handleToggleExpandAll} className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-black cursor-pointer rounded transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-700">
               <span className="text-xs">{isAllExpanded ? '▼' : '▶'}</span>
             </button>
           </div>
-
-          <div className="flex-shrink-0 flex items-center">
-            <Checkbox
-              checked={isAllChecked}
-              indeterminate={isIndeterminate}
-              onChange={handleToggleSelectAll}
-            />
-          </div>
-
+          <div className="flex-shrink-0 flex items-center"><Checkbox checked={isAllChecked} indeterminate={isIndeterminate} onChange={handleToggleSelectAll} /></div>
           <div className="flex-shrink-0 flex items-center justify-center w-8 h-8"></div>
-
           <div className="flex-1 min-w-0">
-            <button
-              onClick={() => handleSort('name')}
-              className={`flex items-center gap-2 text-sm font-semibold transition-colors ${sortBy === 'name' ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
-            >
-              Name
-              {sortBy === 'name' && (
-                <svg className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-              )}
+            <button onClick={() => handleSort('name')} className={`flex items-center gap-2 text-sm font-semibold transition-colors ${sortBy === 'name' ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}>
+              Name {sortBy === 'name' && (<svg className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>)}
             </button>
           </div>
-
           <div className="w-28 flex-shrink-0">
-            <button
-              onClick={() => handleSort('date')}
-              className={`flex items-center gap-1 text-sm font-semibold transition-colors whitespace-nowrap ${sortBy === 'date' ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
-            >
-              Last modified
-              {sortBy === 'date' && (
-                <svg className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-              )}
+            <button onClick={() => handleSort('date')} className={`flex items-center gap-1 text-sm font-semibold transition-colors whitespace-nowrap ${sortBy === 'date' ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}>
+              Last modified {sortBy === 'date' && (<svg className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>)}
             </button>
           </div>
-
           <div className="w-48 sm:w-64 flex-shrink-0 flex items-center"></div>
-
-          <div className="flex-shrink-0 flex items-center opacity-0 pointer-events-none">
-             <DeleteButton isTrashed={false} onToggle={() => {}} />
-          </div>
-
+          <div className="flex-shrink-0 flex items-center opacity-0 pointer-events-none"><DeleteButton isTrashed={false} onToggle={() => {}} /></div>
         </div>
 
         <TreeContext.Provider value={{ checkboxStates, toggleNode, rowTargets, updateRowTarget, trashedStates, toggleTrash, recalculateHeight }}>
