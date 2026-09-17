@@ -25,6 +25,7 @@ export default function AgentSelectionStep({
       </p>
 
       <div className="w-full flex justify-center mb-10">
+        {/* plan to retrieve available users via “account” in the future */}
         <Select
           label="Departing agent"
           value={selectedDepartingUser}

@@ -5,6 +5,7 @@ import { ArrowLeftRight, Trash, Undo, Retry, Send } from "@gouvfr-lasuite/ui-com
 
 const TreeContext = createContext<any>(null);
 
+// plan to retrieve available users via “account” in the future
 const TARGET_OPTIONS = [
   { label: 'Line Manager (Auditor)', value: '021d6063-a251-472a-919e-325565b35c49' },
   { label: 'Alice Martin (Successor 1)', value: '2d915b4b-a763-4190-83a9-7380982d561e' },
@@ -132,6 +133,7 @@ function Node({ node, style }: any) {
 
       <div className="w-28 flex-shrink-0 text-sm text-zinc-500 dark:text-zinc-400 truncate">{formattedDate}</div>
       <div className={`w-48 sm:w-64 flex-shrink-0 flex items-center ${isTrashed ? 'pointer-events-none' : ''}`}>
+        {/* plan to retrieve available users via “account” in the future */}
         <Select
           label="Select target user"
           options={TARGET_OPTIONS}
@@ -446,6 +448,7 @@ export default function AuditStep({ departingUserName, departingUserId, treeData
           </div>
 
           <div className="w-72">
+            {/* plan to retrieve available users via “account” in the future */}
             <Select
               label="Select target user"
               value={globalTarget || undefined}

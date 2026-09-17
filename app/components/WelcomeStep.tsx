@@ -10,6 +10,7 @@ export default function WelcomeStep({ onNext }: { onNext: () => void }) {
           title="Offboarding Tool"
           subtitle="Welcome to the La Suite Numérique departure management interface. Easily transfer rights and audit files."
           mainButton={
+            // plans to authenticate via “account” in the future
             <Button onClick={onNext} variant="primary" className="transition-transform hover:scale-105">
               Sign In
             </Button>

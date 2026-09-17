@@ -43,6 +43,7 @@ const buildTreeFromFlatList = (flatItems: HandoverAuditItem[]): any[] => {
   return rootNodes;
 };
 
+// plan to retrieve available users via “account” in the future
 const AGENTS = [
   { label: 'John Doe', value: '2c6c1f9f-9b0a-46b9-be85-d63983d1a750' },
   { label: 'Peter Parker', value: 'peter-parker' },
